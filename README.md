@@ -19,12 +19,7 @@ Axios pour les requêtes API
 
 Socket.io-client pour la communication en temps réel
 
-Backend (Node.js + Express)
-
-Express.js
-
-MongoDB avec Mongoose
+Backend (Laravel)
 
 Socket.io pour la synchronisation des vidéos et du chat
 
-JWT (JSON Web Token) pour l'authentification
