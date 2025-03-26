@@ -11,11 +11,7 @@ Frontend (Next.js)
 
 React.js avec Next.js
 
-TypeScript
-
 Tailwind CSS pour le style
-
-Axios pour les requêtes API
 
 Socket.io-client pour la communication en temps réel
 
