@@ -1,12 +1,6 @@
-<<<<<<< HEAD
 "use client"; 
-
 import { useState } from "react";
 import axios from "axios";
-=======
-
-import Image from "next/image";
->>>>>>> 99c93b630dab8b6c1eeb049cf1d95cc5518ab863
 
 export default function Register() {
   const [name, setName] = useState(""); 
@@ -17,19 +11,19 @@ export default function Register() {
   const [error, setError] = useState("");         
   const [successMessage, setSuccessMessage] = useState(""); 
 
-  // Function to handle form submission
+  
   const handleRegister = async (e) => {
     e.preventDefault();
 
     
 
-    // Check if passwords match
+    
     if (password !== confirmPassword) {
       setError("Les mots de passe ne correspondent pas");
       return;
     }
 
-    setError("");  // Clear previous error message
+    setError("");  
 
     try {
       const response = await axios.post(
@@ -38,14 +32,14 @@ export default function Register() {
         { withCredentials: true }
       );
 
-      // If registration is successful
+      // si creation du compte est bon
       setSuccessMessage("Compte créé avec succès ! Vous pouvez maintenant vous connecter.");
-      setError(""); // Clear error message
+      setError(""); e
 
       // Store JWT token in localStorage or cookies
       localStorage.setItem("auth_token", response.data.token); // or use cookies if preferred
 
-      // Redirect to login page after 2 seconds
+      // Redirection au page de login apres 2sec
       setTimeout(() => {
         window.location.href = "/login"; 
       }, 2000);
