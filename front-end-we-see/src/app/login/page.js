@@ -1,7 +1,12 @@
+<<<<<<< HEAD
 "use client";  // Ajouté pour garantir que le code s'exécute côté client
 
 import { useState } from "react";
 import axios from "axios";
+=======
+
+import Image from "next/image";
+>>>>>>> 99c93b630dab8b6c1eeb049cf1d95cc5518ab863
 
 export default function Login() {
   const [username, setusername] = useState(""); 
