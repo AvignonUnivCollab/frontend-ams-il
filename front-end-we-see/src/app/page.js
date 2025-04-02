@@ -1,4 +1,6 @@
 import Image from "next/image";
+import Link from 'next/link';
+
 export default function Home() {
   return (
     <div className="h-screen flex flex-col items-center justify-center bg-custom">
@@ -12,9 +14,9 @@ export default function Home() {
         Watch videos with your friends
       </div>
 
-      <button className="bg-yellow-400 text-black font-bold py-3 px-6 rounded-lg text-lg mt-4">
+      <Link href="\rooms" className="bg-yellow-400 text-black font-bold py-3 px-6 rounded-lg text-lg mt-4">
         Join Room
-      </button>
+      </Link>
 
       <div className="flex flex-row space-x-4 mt-4">
         <button className="bg-gray-700 text-white py-2 px-4 rounded">Create Room</button>

@@ -27,7 +27,7 @@ export default function Register() {
 
     try {
       const response = await axios.post(
-        "http://192.168.2.34:8000/api/register", 
+        "http://127.0.0.1:8000/api/register", 
         { name, username, email, password },
         { withCredentials: true }
       );

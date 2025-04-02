@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import axios from "axios";
-s
+
 export default function Login() {
   const [username, setusername] = useState(""); 
   const [password, setPassword] = useState("");
@@ -14,7 +14,7 @@ export default function Login() {
 
     try {
       const response = await axios.post(
-        "http://192.168.2.34:8000/api/login", 
+        "http://127.0.0.1:8000/api/login", 
         { username, password },
         { withCredentials: true } // Permet d'envoyer des cookies 
       );
@@ -36,7 +36,7 @@ export default function Login() {
         {/* Formulaire de connexion */}
         <form onSubmit={handleLogin}>
           <div className="mb-4">
-            <label htmlFor="us" className="block text-sm font-medium text-white">EUsername</label>
+            <label htmlFor="us" className="block text-sm font-medium text-white">Username</label>
             <input type="text" id="username" name="username" className="mt-2 p-3 w-full border border-gray-300 rounded-md focus:outline-none focus:ring-2 placeholder-white text-amber-50" placeholder="Entrez votre username" value={username} onChange={(e) => setusername(e.target.value)} required />
           </div>
 
