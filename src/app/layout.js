@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
+import { useRouter } from 'next/navigation';
+
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,7 +24,7 @@ export default function RootLayout({ children }) {
 
   // Check authentication status
   useEffect(() => {
-    const token = localStorage.getItem("auth_token"); // Assuming you store the token in localStorage
+    const token = localStorage.getItem("token"); // Assuming you store the token in localStorage
     if (token) {
       setIsAuthenticated(true); // User is logged in
     } else {
@@ -66,8 +68,10 @@ export default function RootLayout({ children }) {
                   
                   <button
                     onClick={() => {
-                      localStorage.removeItem("auth_token"); // Log out the user
+                      localStorage.removeItem("token"); // Log out the user
                       setIsAuthenticated(false); // Update state
+                      router.push("/login");
+                      
                     }}
                     className="hover:text-gray-300"
                   >

@@ -4,13 +4,20 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 export const fetchData = async (endpoint) => {
   try {
     const url = `${API_URL}/${endpoint}`;
-    console.log("Getting data from: ", url);
-    const response = await fetch(url);
-  
+    const token = localStorage.getItem("token")
+
+    const response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        ...(token && { Authorization: `Bearer ${token}` }),
+      },
+    });
+
     if (!response.ok) {
       throw new Error(`Error: ${response.statusText}`);
     }
-    return await response.json();
+    
+    return await response.json(); 
   } catch (error) {
     console.error("API Fetch Error:", error);
     return null;
@@ -23,19 +30,27 @@ export const postData = async(endpoint, data) => {
 
     try {
         const url = `${API_URL}/${endpoint}`; 
+        const token = localStorage.getItem("token");
         const response = await fetch(url, {
           method: "POST",
           headers: {
-            "Content-Type" : "application/json"
+            "Content-Type" : "application/json",
+            ...(token && {Authorization: `Bearer ${token}`})
           },
           body: JSON.stringify(data),
         });
 
-        if(!response.ok) {
-          throw new Error(`Error: ${response.statusText}`);
+        const result = await response.json();
+
+        if(!token && result.data.token) {
+          localStorage.setItem("token", result.data.token);
         }
 
-        return await response.json();
+        if(!response.ok) {
+          throw new Error(result.message ||`Error: ${response.statusText}`);
+        }
+
+        return result;
     } catch(error) {
       console.log("Posting data error: ", error);
       return null;

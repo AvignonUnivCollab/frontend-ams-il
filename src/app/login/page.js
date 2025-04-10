@@ -1,23 +1,27 @@
 "use client";  
 
 import { useState } from "react";
-import axios from "axios";
-import {postData} from "../../../services/api"
+import { postData } from "../../../services/api";
+import { useRouter } from 'next/navigation';
 
 export default function Login() {
   const [username, setUsername] = useState(""); 
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   // Fonction pour gérer la soumission du formulaire
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
 
-    const result = await postData("login", {username, password});
-    if(result) {
-        window.location.href = "/rooms";
+    const result = await postData("login", { username, password });
+    console.log("Login result: ", result);
+    if (result) {
+       localStorage.setItem("token", result.data.token);
+       router.push("/rooms"); 
+       
     } else {
       setError("Erreur d'authentification : " + (error.response?.data?.message || "Une erreur est survenue"));
     }
@@ -34,11 +38,10 @@ export default function Login() {
         <form onSubmit={handleLogin}>
           <div className="mb-4">
             <label 
-              htmlFor="us" 
+              htmlFor="username" 
               className="block text-sm font-medium text-white">
                 Username
             </label>
-
             <input 
               type="text" 
               id="username" 
@@ -55,7 +58,7 @@ export default function Login() {
               htmlFor="password" 
               className="block text-sm font-medium text-white">
                 Mot de passe
-                </label>
+            </label>
             <input 
               type="password" 
               id="password" 
@@ -68,11 +71,11 @@ export default function Login() {
           </div>
 
           <button 
-             type="submit" 
-             className="w-full font-bold text-black p-3 rounded-md focus:outline-none focus:ring-2" 
-             style={{ backgroundColor: "#F6DC43" }} 
-             disabled = {loading}
-             >
+            type="submit" 
+            className="w-full font-bold text-black p-3 rounded-md focus:outline-none focus:ring-2" 
+            style={{ backgroundColor: "#F6DC43" }} 
+            disabled={loading}
+          >
             {loading ? (
               <div className="flex justify-center items-center">
                 <div className="spinner-border animate-spin h-5 w-5 border-4 border-t-4 border-black-200 rounded-full"></div>
