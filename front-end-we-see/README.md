@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
 ## Getting Started
@@ -35,26 +34,3 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-=======
-# frontend-ams-il
-🎥 WatchTogether - Plateforme de Visionnage Collaboratif
-
-📌 Description
-
-WatchTogether est une application web permettant à plusieurs utilisateurs de regarder des vidéos ensemble en temps réel, discuter via un chat intégré et gérer une playlist collaborative.
-
-🛠️ Technologies Utilisées
-
-Frontend (Next.js)
-
-React.js avec Next.js
-
-Tailwind CSS pour le style
-
-Socket.io-client pour la communication en temps réel
-
-Backend (Laravel)
-
-Socket.io pour la synchronisation des vidéos et du chat
-
->>>>>>> main
