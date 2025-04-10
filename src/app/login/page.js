@@ -4,6 +4,7 @@ import { useState } from "react";
 import { postData } from "../../../services/api";
 import { useRouter } from 'next/navigation';
 
+
 export default function Login() {
   const [username, setUsername] = useState(""); 
   const [password, setPassword] = useState("");
@@ -54,11 +55,7 @@ export default function Login() {
           </div>
 
           <div className="mb-6">
-            <label 
-              htmlFor="password" 
-              className="block text-sm font-medium text-white">
-                Mot de passe
-            </label>
+            <label htmlFor="password" className="block text-sm font-medium text-white">Mot de passe </label>
             <input 
               type="password" 
               id="password" 
