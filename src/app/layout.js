@@ -20,17 +20,24 @@ const geistMono = Geist_Mono({
 
 
 export default function RootLayout({ children }) {
+  const router = useRouter(); 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Check authentication status
   useEffect(() => {
-    const token = localStorage.getItem("token"); // Assuming you store the token in localStorage
-    if (token) {
-      setIsAuthenticated(true); // User is logged in
-    } else {
-      setIsAuthenticated(false); // User is not logged in
+    if (typeof window !== "undefined") { 
+      const token = localStorage.getItem("token");
+      if(token) {
+        setIsAuthenticated(true);
+        localStorage.setItem("isAuthenticated", true);
+      }
+
+      if(!token) {
+        localStorage.setItem("isAuthenticated", false);
+      }
+
     }
-  }, []); // Run only once when the component mounts
+    
+  }, []);
 
   return (
     <html lang="en">
@@ -47,43 +54,32 @@ export default function RootLayout({ children }) {
       >
         <nav className="text-white p-4" style={{ backgroundColor: "#6441A4" }}>
           <div className="container mx-auto flex justify-between items-center">
-            <Link href="/" className="text-xl font-bold">
-              WeSee
-            </Link>
+            <Link href="/" className="text-xl font-bold">WeSee</Link>
 
             <div className="hidden md:flex space-x-6">
-              {/* Show links if the user is not logged in */}
               {!isAuthenticated ? (
                 <>
-                  <Link href="/register" className="hover:text-gray-300">
-                    Crée Compte
-                  </Link>
-                  <Link href="/login" className="hover:text-gray-300">
-                    Se connecter
-                  </Link>
+                  <Link href="/register" className="hover:text-gray-300">Crée Compte</Link>
+                  <Link href="/login" className="hover:text-gray-300">Se connecter</Link>
                 </>
               ) : (
-                // Show user-related links if logged in
-                <div className="flex space-x-6">
-                  
+                <>
+                  <span className="text-sm font-medium">Bienvenu 👋 </span>
                   <button
                     onClick={() => {
-                      localStorage.removeItem("token"); // Log out the user
-                      setIsAuthenticated(false); // Update state
-                      router.push("/login");
-                      
-                    }}
+                      if (typeof window !== "undefined") {
+                      localStorage.removeItem("token");
+                      localStorage.removeItem("isAuthenticated");
+                      setIsAuthenticated(false);
+                      router.push("/login"); 
+                    }} }
                     className="hover:text-gray-300"
                   >
-                    Logout
+                    Se déconnecter
                   </button>
-                </div>
+                </>
               )}
             </div>
-
-            <button className="md:hidden flex items-center px-3 py-2 border rounded text-white border-white hover:bg-white hover:text-blue-600">
-              hidden
-            </button>
           </div>
         </nav>
         {children}
