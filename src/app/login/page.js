@@ -12,19 +12,25 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // Fonction pour gérer la soumission du formulaire
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     const result = await postData("login", { username, password });
-    console.log("Login result: ", result);
+    //console.log("Login result: ", result);
+    console.log(localStorage.getItem("user"));
+
     if (result) {
        localStorage.setItem("token", result.data.token);
+       localStorage.setItem("user", result.data.user);
+       localStorage.setItem("isAuthenticated", true);
+       console.log(localStorage.getItem("user"));
        router.push("/rooms"); 
-       
-    } else {
+    } 
+    
+    if(!result) {
       setError("Erreur d'authentification : " + (error.response?.data?.message || "Une erreur est survenue"));
+      localStorage.setItem("isAuthenticated", false);
     }
 
     setLoading(false);
@@ -67,15 +73,14 @@ export default function Login() {
               required />
           </div>
 
-          <button 
-            type="submit" 
-            className="w-full font-bold text-black p-3 rounded-md focus:outline-none focus:ring-2" 
-            style={{ backgroundColor: "#F6DC43" }} 
+          <button
+            type="submit"
             disabled={loading}
+            className="w-full font-bold text-black bg-yellow-300 p-3 rounded-md hover:bg-yellow-400 transition-all"
           >
             {loading ? (
               <div className="flex justify-center items-center">
-                <div className="spinner-border animate-spin h-5 w-5 border-4 border-t-4 border-black-200 rounded-full"></div>
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
               </div>
             ) : (
               "Se connecter"

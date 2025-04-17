@@ -17,6 +17,8 @@ export default function rooms() {
       try {
         setLoading(true);
         const result = await fetchData("rooms");
+        const user = localStorage.getItem("user");
+        
         console.log(result);
         if (result && result.data?.length > 0) {
           setRooms(result.data);

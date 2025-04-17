@@ -1,60 +1,46 @@
-"use client"; 
+"use client";
 import { useState } from "react";
-import axios from "axios";
-import Link from 'next/link';
-import Image from 'next/image';
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { postData } from "../../../services/api";
 
 export default function Register() {
-  const [name, setName] = useState(""); 
-  const [username, setUsername] = useState(""); 
-  const [email, setEmail] = useState("");  
-  const [password, setPassword] = useState("");   
-  const [confirmPassword, setConfirmPassword] = useState(""); 
-  const [error, setError] = useState("");         
-  const [successMessage, setSuccessMessage] = useState(""); 
+  const [name, setName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
-  
   const handleRegister = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
-    
-
-    
     if (password !== confirmPassword) {
-      setError("Les mots de passe ne correspondent pas");
+      setMessage("Les mots de passe ne correspondent pas.");
+      setLoading(false);
       return;
     }
 
-    setError("");  
+    const result = await postData(
+      "register",
+      { name, username, email, password },
+      { withCredentials: true }
+    );
 
-    try {
-      const response = await axios.post(
-        "http://127.0.0.1:8000/api/register", 
-        { name, username, email, password },
-        { withCredentials: true }
-      );
+    if (result) {
+      setMessage("Compte créé avec succès ! Vous pouvez maintenant vous connecter.");
+      localStorage.setItem("token", result.data.token);
+      router.push("/login");
+    } 
 
-      // si creation du compte est bon
-      setSuccessMessage("Compte créé avec succès ! Vous pouvez maintenant vous connecter.");
-      setError(""); e
-
-      // Store JWT token in localStorage or cookies
-      localStorage.setItem("auth_token", response.data.token); // or use cookies if preferred
-
-      // Redirection au page de login apres 2sec
-      setTimeout(() => {
-        window.location.href = "/login"; 
-      }, 2000);
-    } catch (error) {
-      // Handle API error responses
-      if (error.response?.status === 422) {
-        const errorMessages = error.response?.data?.errors || {};
-        setError(Object.values(errorMessages).join(", ") || "Les données envoyées sont incorrectes.");
-      } else {
-        setError(error.response?.data?.message || "Une erreur est survenue");
-      }
-      setSuccessMessage(""); // Clear success message
+    if (!result) {
+      const errorMessages = result.error.response?.data?.errors || {};
+      setMessage(Object.values(errorMessages).join(", ") || "Les données envoyées sont incorrectes.");
     }
+    setLoading(false);
   };
 
   return (
@@ -139,18 +125,23 @@ export default function Register() {
           </div>
 
           {/* Bouton d'inscription */}
-          <button 
-            type="submit" 
-            className="w-full font-bold text-black p-3 rounded-md focus:outline-none focus:ring-2" 
-            style={{ backgroundColor: "#F6DC43" }} 
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full font-bold text-black bg-yellow-300 p-3 rounded-md hover:bg-yellow-400 transition-all"
           >
-            S&apos;inscrire
+            {loading ? (
+              <div className="flex justify-center items-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+              </div>
+            ) : (
+              "S'inscrire"
+            )}
           </button>
         </form>
 
         {/* Messages d'erreur ou de succès */}
-        {error && <div className="text-red-500 mt-4">{error}</div>}
-        {successMessage && <div className="text-green-500 mt-4">{successMessage}</div>}
+        {message && <div className="text-green-500 mt-4">{message}</div>}
 
         {/* Lien vers la page de connexion */}
         <div className="mt-4 text-center">
