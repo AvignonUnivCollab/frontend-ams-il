@@ -12,7 +12,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // Fonction pour gérer la soumission du formulaire
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
