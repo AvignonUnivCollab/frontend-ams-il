@@ -21,8 +21,12 @@ export default function Login() {
     console.log(localStorage.getItem("user"));
 
     if (result) {
+    
        localStorage.setItem("token", result.data.token);
        localStorage.setItem("user", result.data.user);
+       const user = localStorage.getItem("user");
+       console.log(user);
+
        localStorage.setItem("isAuthenticated", true);
        console.log(localStorage.getItem("user"));
        router.push("/rooms"); 
