@@ -1,26 +1,22 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/router"; 
 import { fetchData } from "../../../services/api";
 import styles from "../../style/roompage.module.css";
+import { useSearchParams, useRouter } from "next/navigation"; 
 
 export default function RoomPage() {
   const router = useRouter();
-  const [isMounted, setIsMounted] = useState(false); 
   const [room, setRoom] = useState(null);
   const [message, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
   const [playlist, setPlaylist] = useState([]);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
+  const searchParams = useSearchParams(); 
+  const roomId = searchParams.get("roomId");
 
   // Use useEffect to access the query param after component is mounted
   useEffect(() => {
-    if (!isMounted) return; 
-    const { roomId } = router.query; 
 
     if (!roomId) return; 
 
@@ -34,7 +30,7 @@ export default function RoomPage() {
     };
 
     fetchRoom();
-  }, [isMounted, router.query]); 
+  }, [roomId]); 
 
   if (!roomId) {
     return <p>Loading...</p>; 
@@ -67,20 +63,20 @@ export default function RoomPage() {
             <h3>Messages</h3>
             <div className={styles["message-list"]}>
               {/* Liste des messages */}
-              {message.map((msg, index) => (
+              {/*message.map((msg, index) => (
                 <div key={index} className={styles["message"]}>
                   <strong>{msg.user}</strong>: {msg.text}
                 </div>
-              ))}
+              ))*/}
             </div>
           </div>
 
           <div className={styles["playlist"]}>
             <h3>Playlist</h3>
             <ul>
-              {playlist.map((video, index) => (
+              {/*playlist.map((video, index) => (
                 <li key={index}>{video.name}</li>
-              ))}
+              ))*/}
             </ul>
           </div>
         </div>

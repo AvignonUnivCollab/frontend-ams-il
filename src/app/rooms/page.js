@@ -7,7 +7,8 @@ import { useRouter } from 'next/navigation';
 export default function rooms() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sending, setSending] = useState(false);  // This can be set individually for each room
+  const [sending, setSending] = useState({});
+  const [leaving, setLeaving] = useState({});
   const [rooms, setRooms] = useState([]);
   const [filteredRooms, setFilteredRooms] = useState([]);
   const router = useRouter();
@@ -37,13 +38,13 @@ export default function rooms() {
 
   const joinRoom = async (roomId) => {
     try {
-      setSending(true);  // Set the sending state for the current room
+      setSending((prev) => ({ ...prev, [roomId]: true }));
       const result = await postData(`room/${roomId}/join`);
       console.log(result);
 
       if (result && result.data != null) {
         console.log("Room join successful");
-        router.push(`/room?roomId=${roomId}`);
+        router.push(`/videos?roomId=${roomId}`);
 
       } else {
         throw new Error("Failed to join room");
@@ -51,7 +52,32 @@ export default function rooms() {
     } catch (error) {
       console.error("Error joining room", error);
     } finally {
-      setSending(false); 
+      setSending((prev) => ({ ...prev, [roomId]: false }));
+    }
+  };
+
+
+  const leaveRoom = async (roomId) => {
+    try{
+      setLeaving((prev) => ({ ...prev, [roomId]: true }));
+      const result = await postData(`room/${roomId}/leave`);
+      console.log(result);
+
+      if(result && result.data != null) {
+        console.log("Room leave successfull");
+
+        setRooms((prevRooms) => 
+          prevRooms.map((room) => 
+           room.id == roomId ? {...room, is_joined : false, user_count : room.user_count -1} : room
+          )
+        );
+      } else {
+        throw new Error("Failed to leave room");
+      }
+    }catch(error) {
+      console.error("Error joining room", error);
+    } finally {
+      setLeaving((prev) => ({ ...prev, [roomId]: false }));
     }
   };
 
@@ -85,11 +111,20 @@ export default function rooms() {
                 {room.video_count} videos • {room.user_count} utilisateurs • {room.message_count} messages{" "}
               </i>
               <button
-                className="bg-yellow-500 text-black p-2 rounded-lg w-full hover:bg-yellow-600"
-                onClick={() => joinRoom(room.id)}
+                className={`${
+                  room.is_joined ? "bg-red-500 hover:bg-red-600" : "bg-yellow-500 hover:bg-yellow-600"
+                } text-black p-2 rounded-lg w-full`}
+                onClick={() => (room.is_joined ? leaveRoom(room.id) : joinRoom(room.id))}
               >
-                {sending ? "Joining..." : "Rejoindre"}
+                {room.is_joined
+                  ? leaving[room.id]
+                    ? "En cours..."
+                    : "Quitter"
+                  : sending[room.id]
+                    ? "En cours..."
+                    : "Rejoindre"}
               </button>
+
             </div>
           ))}
         </div>
