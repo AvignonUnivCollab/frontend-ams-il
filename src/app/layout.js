@@ -1,4 +1,4 @@
-"use client";  // This tells Next.js to treat this as a client component
+"use client";  
 
 import { useEffect, useState } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -64,15 +64,9 @@ export default function RootLayout({ children }) {
                 </>
               ) : (
                 <>
-                  <span className="text-sm font-medium">Bienvenu 👋 </span>
+                  <span className="text-sm font-medium">Bienvenu 👋</span>
                   <button
-                    onClick={() => {
-                      if (typeof window !== "undefined") {
-                      localStorage.removeItem("token");
-                      localStorage.removeItem("isAuthenticated");
-                      setIsAuthenticated(false);
-                      router.push("/login"); 
-                    }} }
+                    onClick={handleLogout}
                     className="hover:text-gray-300"
                   >
                     Se déconnecter
