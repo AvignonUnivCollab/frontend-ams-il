@@ -1,7 +1,7 @@
 const WebSocket = require("ws");
 const userSessions = new Map();
-
 const server = new WebSocket.Server({ port: 8080 });
+const roomInfos = new Map();
 
 server.on("connection", (ws, req) => {
   const clientIp = req.socket.remoteAddress;
@@ -22,7 +22,6 @@ server.on("connection", (ws, req) => {
 
     switch (data.type) {
       case "getRooms":
-        // Récupération des roomId uniques
         const rooms = [...new Set(Array.from(userSessions.values()).map(session => session.roomId))];
         ws.send(JSON.stringify({ roomsList: rooms }));
         break;
@@ -31,7 +30,6 @@ server.on("connection", (ws, req) => {
         userId = data.userId;
         pseudo = data.pseudo || "User_" + Math.floor(Math.random() * 10000);
         roomId = data.roomId || "default";
-        // Vérifier si aucun utilisateur n'est déjà présent dans la room donnée
         let isFirst = true;
         for (let session of userSessions.values()) {
           if (session.roomId === roomId) {
@@ -39,12 +37,37 @@ server.on("connection", (ws, req) => {
             break;
           }
         }
-        if (isFirst && data.createNew) {
-          console.log(`>> Premier utilisateur dans la room ${roomId} <<`);
+        // stocke ou renvoie les méta-data
+        if (data.createNew) {
+          // 1) c'est le propriétaire qui crée : on stocke
+          roomInfos.set(roomId, {
+            roomName: data.roomName,
+            roomDescription: data.roomDescription,
+            videoURL: data.videoURL
+          });
+          // 2) on signale qu'il est owner
           ws.send(JSON.stringify({ type: "firstUser" }));
+          // 3) on broadcast à toute la room (même s'il n'y a encore que lui)
+          broadcastJSON({
+            type: "room-info",
+            roomName: data.roomName,
+            roomDescription: data.roomDescription,
+            videoURL: data.videoURL
+          }, roomId);
+        } else {
+          // quelqu'un rejoint un salon existant
+          const info = roomInfos.get(roomId);
+          if (info) {
+            // on envoie uniquement à lui les infos
+            ws.send(JSON.stringify({
+              type: "room-info",
+              ...info
+            }));
+          }
         }
         userSessions.set(userId, { ws, pseudo, roomId });
         broadcastMessage(`${pseudo} a rejoint la salle de discussion.`, roomId);
+
         break;
 
       case "message":
@@ -85,7 +108,6 @@ server.on("connection", (ws, req) => {
           }, 3000);
         break;
           
-
       default:
         console.log("Type de message inconnu :", data);
         break;
