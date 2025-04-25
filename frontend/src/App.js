@@ -1,5 +1,17 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
+import YouTubePlayer from "./components/YoutubePlayer";
 import "./App.css";
+
+function extractYouTubeID(url) {
+  try {
+    const u = new URL(url);
+    if (u.hostname.includes("youtube.com")) return u.searchParams.get("v");
+    if (u.hostname.includes("youtu.be")) return u.pathname.slice(1);
+  } catch {
+    return null;
+  }
+  return null;
+}
 
 function App() {
   const [socket, setSocket] = useState(null);
@@ -20,10 +32,16 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentRoomId, setCurrentRoomId] = useState("");
   const [showJoinPanel, setShowJoinPanel] = useState(false);
-
-  // Réinitialiser tout pour revenir au menu
+  const [roomName, setRoomName] = useState("");
+  const [roomDescription, setRoomDescription] = useState("");
+  const [videoURL, setVideoURL] = useState("");
+  const [videoFile, setVideoFile] = useState(null);
+  const [videoSrc, setVideoSrc] = useState("");
+  const videoId = extractYouTubeID(videoSrc);
+  const isYouTube = Boolean(videoId);
+  const playerRef = useRef(null);
   const resetStates = useCallback(() => {
-    setShowChat(false);
+    setShowChat(false); 
     setIsFirstUser(false);
     setPseudo(null);
     setMessages([]);
@@ -33,14 +51,12 @@ function App() {
     setRoomClosed(false);
     setCurrentRoomId("");
     setShowJoinPanel(false);
-
     if (socket) {
       socket.close();
     }
     connectWebSocket();
   });
 
-  // 1) Connexion WebSocket (montage)
   const connectWebSocket = useCallback(() => {
     const ws = new WebSocket("ws://localhost:8080");
 
@@ -68,18 +84,39 @@ function App() {
 
       switch (data.type) {
         case "roomsList":
+        case "room-info":
+          setRoomName(data.roomName);
+          setRoomDescription(data.roomDescription);
+          setVideoSrc(data.videoURL);
+        return;
         case undefined:
           if (data.roomsList) setRooms(data.roomsList);
           else if (data.message) setMessages(m => [...m, data.message]);
           break;
 
-        case "video-sync":
-          if (videoRef.current) {
-            data.isPlaying ? videoRef.current.play() : videoRef.current.pause();
-            setIsPlaying(data.isPlaying);
-            if (Math.abs(videoRef.current.currentTime - data.currentTime) > 1) {
-              videoRef.current.currentTime = data.currentTime;
-            }
+          case "video-sync":
+          if (playerRef.current) {
+            const video = playerRef.current;
+
+            const syncVideo = async () => {
+              try {
+                if (data.isPlaying) {
+                  await video.play();
+                } else {
+                  await video.pause();
+                }
+
+                setIsPlaying(data.isPlaying);
+
+                if (Math.abs(video.getCurrentTime() - data.currentTime) > 1) {
+                  video.seekTo(data.currentTime, true);
+                }
+              } catch (error) {
+                console.warn("Erreur lors de la sync vidéo :", error);
+              }
+            };
+
+            syncVideo();
           }
           break;
 
@@ -111,10 +148,8 @@ function App() {
 
   useEffect(() => {
     connectWebSocket();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // on le lance une fois
+  }, []);
 
-  // 2) Rafraîchissement des salons toutes les 3 s (dépend de socket)
   useEffect(() => {
     if (!socket) return;
     const id = setInterval(() => {
@@ -125,8 +160,53 @@ function App() {
     return () => clearInterval(id);
   }, [socket]);
 
-  const generatePseudo = () => `user_${Math.floor(Math.random() * 100000)}`;
+  const onYouTubeIframeAPIReady = () => {
+    if (window.YT) {
+      const onPlayerStateChange = (event) => {
+        if (event.data === window.YT.PlayerState.PLAYING) {
+          setIsPlaying(true);
+        } else {
+          setIsPlaying(false);
+        }
+      };
 
+      const player = new window.YT.Player('player', {
+        videoId: videoId,
+        events: {
+          'onStateChange': onPlayerStateChange,
+        },
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (!videoId) return;
+    window.onYouTubeIframeAPIReady = () => {
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+      playerRef.current = new window.YT.Player("yt-player", {
+        videoId,
+        playerVars: { autoplay: 0, controls: 0 },
+        events: {
+          onStateChange: e => {
+            setIsPlaying(e.data === window.YT.PlayerState.PLAYING);
+          }
+        }
+      });
+    };
+    const tag = document.createElement("script");
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.body.appendChild(tag);
+    return () => {
+      document.body.removeChild(tag);
+      window.onYouTubeIframeAPIReady = null;
+    };
+  }, [videoId]);
+
+  const generatePseudo = () => `user_${Math.floor(Math.random() * 100000)}`;
+  
   const sendMessage = () => {
     if (!input.trim()) return;
     if (socket && socket.readyState === WebSocket.OPEN) {
@@ -143,7 +223,6 @@ function App() {
     }
   };
 
-  // Connexion avec compte (pour voir le bouton de création)
   const login = () => {
     if (!username.trim()) {
       alert("Veuillez entrer un nom d'utilisateur");
@@ -152,38 +231,63 @@ function App() {
     const pseudoFromAPI = username.trim();
     setPseudo(pseudoFromAPI);
     setIsLoggedIn(true);
-    // Une fois connecté, on actualise la liste des salons
     if (socket && socket.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({ type: "getRooms" }));
     }
   };
 
-  // Créer un salon (accessible uniquement aux utilisateurs connectés)
   const createRoom = () => {
     if (!isLoggedIn) {
       alert("Seuls les utilisateurs connectés peuvent créer une room.");
       return;
     }
+  
+    if (!roomName.trim()) {
+      alert("Veuillez entrer un nom pour le salon.");
+      return;
+    }
+  
     const newRoomId = `room_${Date.now()}`;
     setCurrentRoomId(newRoomId);
+  
+    let final;
+    final = videoURL;
+
+    if (videoFile) {
+      final = URL.createObjectURL(videoFile);
+    } else if (extractYouTubeID(videoURL)) {
+      const id = extractYouTubeID(videoURL);
+      final = `https://www.youtube.com/embed/${id}?enablejsapi=1&controls=0`;
+    } else {
+      final = videoURL;
+    } setVideoSrc(final);
+  
     if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(
-        JSON.stringify({
-          type: "join",
-          pseudo,
-          userId: pseudo,
-          roomId: newRoomId,
-          createNew: true,
-        })
-      );
-      setShowChat(true);
+      socket.send(JSON.stringify({
+        type: "join",
+        pseudo,
+        userId: pseudo,
+        roomId: newRoomId,
+        createNew: true,
+        roomName,
+        roomDescription,
+        videoURL: final,
+      }));
+  
+      const detailsMessage = {
+        type: "message",
+        pseudo: "🛠️ Système",
+        roomId: newRoomId,
+        message: `📢 Salon "${roomName}" créé avec la description : "${roomDescription}" et la vidéo : ${final || "aucune vidéo définie."}`,
+      };
+      socket.send(JSON.stringify(detailsMessage));
     }
+  
+    setShowChat(true);
   };
 
-  // Rejoindre un salon existant via sa roomId
   const joinRoom = (roomId) => {
     setCurrentRoomId(roomId);
-    // Pour un utilisateur anonyme, on génère un pseudo
     if (!isLoggedIn) {
       setPseudo(generatePseudo());
     }
@@ -197,35 +301,34 @@ function App() {
         })
       );
       setShowChat(true);
-      setShowJoinPanel(false); // masquer le panel une fois que l'utilisateur a rejoint
+      setShowJoinPanel(false);
     }
   };
 
-  const togglePlayPause = () => {
-    if (!videoRef.current) return;
-    let nextIsPlaying;
-    if (videoRef.current.paused) {
-      videoRef.current.play();
-      nextIsPlaying = true;
-      setIsPlaying(true);
+  const containerRef = useRef(null);
+
+  const togglePlayPause = useCallback(async () => {
+    if (!playerRef.current) return;
+    const player = playerRef.current;
+    if (player.getPlayerState() === window.YT.PlayerState.PLAYING) {
+      player.pauseVideo();
+      socket.send(JSON.stringify({
+        type: "video-sync",
+        isPlaying: false,
+        currentTime: player.getCurrentTime(),
+        roomId: currentRoomId
+      }));
     } else {
-      videoRef.current.pause();
-      nextIsPlaying = false;
-      setIsPlaying(false);
+      player.playVideo();
+      socket.send(JSON.stringify({
+        type: "video-sync",
+        isPlaying: true,
+        currentTime: player.getCurrentTime(),
+        roomId: currentRoomId
+      }));
     }
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(
-        JSON.stringify({
-          type: "video-sync",
-          isPlaying: nextIsPlaying,
-          currentTime: videoRef.current.currentTime,
-          roomId: currentRoomId,
-        })
-      );
-    }
-  };
+  }, [socket, currentRoomId]);
 
-  // Fermer la room (owner)
   const closeRoom = () => {
     if (socket?.readyState === WebSocket.OPEN && currentRoomId) {
       socket.send(JSON.stringify({
@@ -233,12 +336,10 @@ function App() {
         roomId: currentRoomId,
         pseudo,
       }));
-      // ** Ne pas appeler resetStates() ici ** : on attend room-closed
       console.log("🛑 Demande de fermeture envoyée");
     }
   };
 
-  // Quitter sans fermer
   const quitRoom = () => {
     if (socket?.readyState === WebSocket.OPEN) {
       socket.send(JSON.stringify({
@@ -250,6 +351,29 @@ function App() {
     }
     resetStates();
   };
+
+  const toggleFullScreen = () => {
+    if (!containerRef.current) return;
+    // doit être déclenché par un clic utilisateur pour marcher :contentReference[oaicite:4]{index=4}
+    if (!document.fullscreenElement) {
+      containerRef.current
+        .requestFullscreen()
+        .catch(err => console.error("Fullscreen error:", err));
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+const handleQualityChange = (e) => {
+  const quality = e.target.value;
+  console.log(`Qualité sélectionnée: ${quality}p`);
+};
+
+const handleSpeedChange = (e) => {
+  if (videoRef.current) {
+    videoRef.current.playbackRate = parseFloat(e.target.value);
+  }
+};
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") sendMessage();
@@ -268,7 +392,7 @@ function App() {
         )}
   
         <div id="chat">
-          <h1>Salon de discussion – {currentRoomId}</h1>
+          <h1>Salon de discussion – {roomName}</h1>
   
           {/* Bouton “Fermer la Room” visible uniquement pour le créateur */}
           {isFirstUser && !roomClosed && !closingRoom && (
@@ -283,25 +407,47 @@ function App() {
                 <tr>
                   {/* Colonne vidéo */}
                   <td>
-                    <div className="video-container">
-                      <video ref={videoRef} width="400">
-                        <source
-                          src="https://www.w3schools.com/html/mov_bbb.mp4"
-                          type="video/mp4"
-                        />
-                        Votre navigateur ne supporte pas la vidéo.
-                      </video>
-  
-                      {/* Contrôle Play/Pause pour l’owner */}
-                      {isFirstUser && !roomClosed && !closingRoom && (
-                        <button
-                          className="overlay-play-btn"
-                          onClick={togglePlayPause}
-                        >
-                          {isPlaying ? "⏸" : "▶"}
-                        </button>
-                      )}
+                  <div className="video-container">
+                    {videoSrc ? (
+                      <YouTubePlayer
+                      ref={containerRef}
+                      src={videoSrc}
+                      isOwner={isFirstUser}
+                      playing={isPlaying}
+                      onPlayPause={togglePlayPause}
+                      />
+                    ) : (
+                      <p>Aucune vidéo à afficher</p>
+                    )}
+                  </div>
+                    <div className="video-controls-panel">
+                      <div className="video-description">
+                        <p>{roomDescription}</p>
+                      </div>
+
+                      <div className="video-actions">
+                        <div className="likes-dislikes">
+                          <button className="like-button">👍</button>
+                          <button className="dislike-button">👎</button>
+                        </div>
+
+                        <div className="video-options">
+                          <button onClick={toggleFullScreen}>⛶ Plein écran</button>
+                          <select onChange={handleQualityChange}>
+                            <option value="1080">1080p</option>
+                            <option value="720">720p</option>
+                            <option value="480">480p</option>
+                          </select>
+                          <select onChange={handleSpeedChange}>
+                            <option value="1">×1</option>
+                            <option value="1.5">×1.5</option>
+                            <option value="2">×2</option>
+                            <option value="0.5">×0.5</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
+
                   </td>
   
                   {/* Colonne chat */}
@@ -336,7 +482,7 @@ function App() {
                         <button onClick={quitRoom}>Quitter la room</button>
                       )}
                     </div>
-  
+                    
                     {/* Message “room closed” */}
                     {roomClosed && (
                       <div className="controls">
@@ -353,11 +499,10 @@ function App() {
     );
   }
 
-    // Écran principal (menu) avec authentification et panels côte à côte
     return (
       <div className="App">
         <header className="App-header"></header>
-  
+        
         {!isLoggedIn ? (
           <div className="login-panels">
             {/* Panel Connexion Anonyme */}
@@ -406,6 +551,7 @@ function App() {
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Nom d'utilisateur"
                 className="input-field"
+                required
               />
               <input
                 type="password"
@@ -413,6 +559,7 @@ function App() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mot de passe"
                 className="input-field"
+                required
               />
               <button className="login-btn" onClick={login}>
                 Se connecter
@@ -423,10 +570,40 @@ function App() {
           <div className="logged panel panel-account">
           <h2>Bienvenue {pseudo}</h2>
           <div className="menu">
-            <button className="login-btn" onClick={() => setShowJoinPanel(true)}>Join a room</button>
-            <button className="create-room-btn login-btn" onClick={createRoom}>
-              Créer un salon
-            </button>
+                <div className="create-room-panel">
+                  <h2>Créer un salon</h2>
+
+                  <input
+                    type="text"
+                    placeholder="Nom du salon"
+                    value={roomName}
+                    onChange={(e) => setRoomName(e.target.value)}
+                  />
+
+                  <textarea
+                    placeholder="Description du salon"
+                    value={roomDescription}
+                    onChange={(e) => setRoomDescription(e.target.value)}
+                  ></textarea>
+
+                  <div className="video-source-choice">
+                    <label>🎬 Vidéo à diffuser :</label>
+                    <input
+                      type="text"
+                      placeholder="URL YouTube ou .mp4"
+                      value={videoURL}
+                      onChange={(e) => setVideoURL(e.target.value)}
+                    />
+                    <span className="or">ou</span>
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={(e) => setVideoFile(e.target.files[0])}
+                    />
+                  </div>
+
+                  <button onClick={createRoom}>Créer le salon</button>
+                </div>
           </div>
           {showJoinPanel && (
             <div className="join-panel">
@@ -463,42 +640,3 @@ function App() {
 }
 
 export default App;
-
-/*
-<div className="logged">
-          <h2>Bienvenue {pseudo}</h2>
-          <div className="menu">
-            <button onClick={() => setShowJoinPanel(true)}>Join a room</button>
-            <button className="create-room-btn" onClick={createRoom}>
-              Créer un salon
-            </button>
-          </div>
-          {showJoinPanel && (
-            <div className="join-panel">
-              <h3>Salons existants</h3>
-              {rooms.length > 0 ? (
-                <table className="rooms-table">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rooms.map((room) => (
-                      <tr key={room}>
-                        <td>{room}</td>
-                        <td>
-                          <button onClick={() => joinRoom(room)}>Join</button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p>Aucun salon existant.</p>
-              )}
-            </div>
-          )}
-        </div>
-*/
