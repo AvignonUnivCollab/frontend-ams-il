@@ -1,0 +1,360 @@
+/* App.css */
+/* =========================
+   Palette Twitch:
+   - Violet Twitch:  #9146FF
+   - Violet foncé:   #6441A5
+   - Noir Twitch:    #18181B
+   - Gris clair:     #EFEFF1
+   ========================= */
+
+/* Global */
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background-color: #18181B; /* fond sombre Twitch */
+  color: #EFEFF1;           /* texte clair */
+  font-family: Arial, sans-serif;
+}
+
+.App {
+  text-align: center;
+}
+
+.App-header {
+  background-color: #6441A5; /* violet foncé */
+  padding: 10px;
+}
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.tabs button {
+  background-color: #9146FF;
+  color: #EFEFF1;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.tabs button:hover {
+  background-color: #772ce8;
+}
+
+/* Conteneur de login */
+.login-container, .menu {
+  margin-top: 20px;
+}
+
+/* Panels gris clair */
+.panel {
+  background: #EFEFF1; /* gris clair */
+  padding: 20px;
+  border-radius: 8px;
+  vertical-align: top;
+  color: #18181B;      /* texte noir */
+}
+
+/* Pour distinguer join-btn / login-btn */
+.join-btn,
+.login-btn {
+  margin-top: 10px;
+  padding: 10px;
+  cursor: pointer;
+  border: none;
+  border-radius: 5px;
+}
+
+/* Style du bouton "Join Anonyme" */
+.join-btn {
+  background-color: #9146FF;
+  color: #EFEFF1;
+}
+
+.join-btn:hover {
+  background-color: #772ce8; /* un peu plus sombre */
+}
+
+/* Style du bouton "Login" */
+.login-btn {
+  background-color: #6441A5;
+  color: #EFEFF1;
+}
+
+.login-btn:hover {
+  background-color: #52348a;
+}
+
+/* Chat */
+#chat {
+  margin: 20px auto;
+  width: 80%;
+  max-width: 900px;
+}
+
+/* Table globale */
+.chat-content table {
+  width: 100%;
+}
+
+/* =====================
+   Zone vidéo
+===================== */
+.video-container {
+  position: relative; /* Pour overlay du bouton Play/Pause */
+  background: #18181B;
+  padding: 10px;
+  border-radius: 10px;
+  text-align: center;
+}
+
+/* Container des messages */
+.messages-container {
+  position: relative;
+  width: 500px;
+  height: 400px;
+  background-color: #1F1F23; /* un gris très sombre Twitch */
+  margin-left: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  color: #EFEFF1; /* texte clair sur fond sombre */
+}
+
+/* Liste des messages */
+.messages-list {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 10px;
+  background-color: #18181B; /* fond sombre un peu plus clair */
+}
+
+/* Message individuel */
+.message {
+  background: #6441A5;   /* violet foncé Twitch */
+  margin: 5px 0;
+  padding: 5px 10px;
+  border-radius: 5px;
+  text-align: left;
+  font-size: 14px;
+  color: #EFEFF1;
+}
+
+/* Barre d'envoi => en bas de .messages-container */
+.message-input-container {
+  display: flex;
+  padding: 10px;
+  background-color: #322F4D; /* un violet plus sombre */
+}
+
+.message-input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  margin-right: 8px;
+  font-size: 14px;
+  color: #18181B;          /* texte foncé */
+  background-color: #EFEFF1;
+}
+
+.send-btn {
+  padding: 8px 16px;
+  cursor: pointer;
+  background-color: #9146FF; /* Violet Twitch */
+  color: #EFEFF1;
+  border: none;
+  border-radius: 5px;
+}
+
+.send-btn:hover {
+  background-color: #772ce8;
+}
+
+/* Contrôles (Play/Pause, etc.) */
+.controls {
+  margin-top: 10px;
+}
+
+/* =====================
+   NOUVEAUX STYLES
+===================== */
+
+/* Bouton croix rouge en haut à gauche */
+.close-room-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+
+  background-color: red;
+  color: white;
+  font-size: 24px;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  z-index: 999; /* qu'il reste au-dessus */
+}
+
+.close-room-btn:hover {
+  background-color: darkred;
+}
+
+/* Bouton overlay Play/Pause sur la vidéo */
+.overlay-play-btn {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+
+  font-size: 40px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #EFEFF1;
+  border: none;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  cursor: pointer;
+}
+
+.overlay-play-btn:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+/* Conteneur "room fermée" */
+.room-closed-screen {
+  text-align: center;
+  margin-top: 80px;
+}
+
+/* Style pour le panel de création de salon */
+.create-room-panel {
+  background: #EFEFF1;
+  padding: 20px;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.create-room-panel input,
+.create-room-panel button {
+  margin-top: 10px;
+}
+
+.create-room-panel label {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.create-room-panel label input {
+  margin-left: 10px;
+}
+
+/* ==== Panels de connexion côte à côte ==== */
+.login-panels {
+  display: flex;
+  gap: 2rem;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 2rem;
+}
+
+/* Style commun aux deux panels */
+.panel {
+  flex: 1;
+  max-width: 400px;
+  background-color: #1F1F23;  /* gris très sombre Twitch */
+  color: #EFEFF1;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Panel Anonyme : accent violet clair */
+.panel-anon {
+  border: 2px solid #9146FF;
+}
+
+/* Panel Compte : accent violet foncé */
+.panel-account {
+  border: 2px solid #6441A5;
+}
+
+/* Inputs partagés */
+.panel .input-field {
+  width: 100%;
+  margin-top: 1rem;
+  padding: 0.75rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background-color: #2A2A2E; /* gris foncé */
+  color: #EFEFF1;
+}
+
+/* Boutons */
+.join-btn,
+.login-btn {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  width: 100%;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* Join Anonyme */
+.join-btn {
+  background-color: #9146FF;
+  color: #EFEFF1;
+}
+.join-btn:hover {
+  background-color: #772ce8;
+}
+
+/* Login Compte */
+.login-btn {
+  background-color: #6441A5;
+  color: #EFEFF1;
+}
+.login-btn:hover {
+  background-color: #52348a;
+}
+
+/* Panel de liste des salons */
+.join-panel {
+  margin-top: 1rem;
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: #2A2A2E;
+  padding: 1rem;
+  border-radius: 4px;
+}
+.join-panel table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.join-panel th,
+.join-panel td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #444;
+}
+.join-panel button {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9rem;
+  background-color: #9146FF;
+  color: #EFEFF1;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.join-panel button:hover {
+  background-color: #772ce8;
+}
