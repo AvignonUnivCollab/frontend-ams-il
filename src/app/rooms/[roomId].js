@@ -1,12 +1,11 @@
 "use client";  
 
 import { useEffect, useState } from "react";
-import { fetchData, postData } from "../../../services/api";
-import { useRouter } from 'next/navigation';
+import { fetchData, postData } from "../../../services/api"; 
+import { useRouter } from 'next/router'; 
 import Link from 'next/link';
 
-
-export default function Rooms() {
+export default function RoomPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState({});
@@ -15,6 +14,9 @@ export default function Rooms() {
   const [filteredRooms, setFilteredRooms] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const router = useRouter();
+
+  // Accessing roomId from the query params
+  const { roomId } = router.query;
 
   // Fetch rooms data on component mount
   useEffect(() => {
@@ -35,7 +37,7 @@ export default function Rooms() {
     };
 
     fetchRooms();
-  }, []);
+  }, []);  // Runs only once when the component is mounted
 
   // Filter rooms by search query
   useEffect(() => {
@@ -89,7 +91,6 @@ export default function Rooms() {
     }
   };
 
-  
   return (
     <div className="container mx-auto p-4 mt-3">
       {loading && (
@@ -99,7 +100,7 @@ export default function Rooms() {
       )}
 
       <div className="mb-4 flex justify-between items-center">
-        {/* recherche bar */}
+        {/* Search Bar */}
         <div className="flex items-center space-x-2">
           <input
             type="text"
@@ -110,10 +111,10 @@ export default function Rooms() {
           />
         </div>
 
-        {/* boutton cree room */}
-        <Link href="\creatroom" className="bg-yellow-400 text-black font-bold py-3 px-6 rounded-lg text-lg mt-4">
-        Create Room
-      </Link>
+        {/* Button to create room */}
+        <Link href="/createroom" className="bg-yellow-400 text-black font-bold py-3 px-6 rounded-lg text-lg mt-4">
+          Create Room
+        </Link>
       </div>
 
       {!loading && filteredRooms.length > 0 && (
