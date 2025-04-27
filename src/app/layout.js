@@ -1,11 +1,10 @@
-"use client";  
+"use client";
 
 import { useEffect, useState } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Link from "next/link";
 import { useRouter } from 'next/navigation';
-
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,27 +16,35 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-
-
 export default function RootLayout({ children }) {
-  const router = useRouter(); 
+  const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [username, setUsername] = useState("");
 
   useEffect(() => {
-    if (typeof window !== "undefined") { 
+    if (typeof window !== "undefined") {
       const token = localStorage.getItem("token");
-      if(token) {
+      const storedUsername = localStorage.getItem("username");
+
+      if (token) {
         setIsAuthenticated(true);
-        localStorage.setItem("isAuthenticated", true);
+        setUsername(storedUsername || ""); // récupère le username
+      } else {
+        setIsAuthenticated(false);
+        setUsername("");
       }
-
-      if(!token) {
-        localStorage.setItem("isAuthenticated", false);
-      }
-
     }
-    
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("username");
+
+    setIsAuthenticated(false);
+    setUsername("");
+
+    router.push("/login");
+  };
 
   return (
     <html lang="en">
@@ -64,7 +71,10 @@ export default function RootLayout({ children }) {
                 </>
               ) : (
                 <>
-                  <span className="text-sm font-medium">Bienvenu 👋</span>
+                  <span className="text-sm font-medium">
+                    Bienvenu 👋 {username ? username : ""}
+                  </span>
+
                   <button
                     onClick={handleLogout}
                     className="hover:text-gray-300"

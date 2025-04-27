@@ -1,4 +1,6 @@
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "http://127.0.0.1:8000/api";
+
+
 
 //Get request function
 export const fetchData = async (endpoint) => {

@@ -55,7 +55,7 @@ export default function Rooms() {
       setSending((prev) => ({ ...prev, [roomId]: true }));
       const result = await postData(`room/${roomId}/join`); // Send request to join the room
       if (result && result.data != null) {
-        router.push(`/videos?roomId=${roomId}`); // Redirect to the video page after joining
+        router.push(`/videos/${roomId}`);
       } else {
         throw new Error("Failed to join room");
       }
