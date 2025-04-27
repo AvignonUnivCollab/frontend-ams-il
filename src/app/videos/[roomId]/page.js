@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState, use } from "react";
-import { fetchData } from "../../../../services/api"; 
+import { fetchData, postData } from "../../../../services/api"; 
 import styles from "../../../style/roompage.module.css";
+import YouTubePlayer from "../../components/YouTubePlayer";
+import Pusher from "pusher-js";
 
 export default function RoomPage({ params }) {
   const { roomId } = use(params);
@@ -10,9 +12,11 @@ export default function RoomPage({ params }) {
   const [room, setRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
+  const [host, setHost] = useState([]);
   const [playlist, setPlaylist] = useState([]);
+  const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [newMessage, setNewMessage] = useState(""); // Nouveau message à écrire
+  const [message, setMessage] = useState(""); // Nouveau message à écrire
 
   useEffect(() => {
     if (!roomId) return;
@@ -20,33 +24,94 @@ export default function RoomPage({ params }) {
     const fetchRoom = async () => {
       try {
         const response = await fetchData(`rooms/${roomId}`);
+        console.log(response);
         if (response) {
           setRoom(response.data);
           setMessages(response.data.messages || []);
           setUsers(response.data.users || []);
-          setPlaylist(response.data.videos || []);
+          setVideos(response.data.videos || []);
+          setHost(response.data.host);
         }
       } catch (error) {
-        console.error("Erreur lors du fetch de la room :", error);
+        if (error.response && error.response.status === 429) {
+          const retryAfter = error.response.headers['retry-after'];
+          const waitTime = retryAfter ? parseInt(retryAfter, 10) * 1000 : 60000; // défaut à 60 secondes
+          console.warn(`Trop de requêtes. Réessai dans ${waitTime / 1000} secondes.`);
+          setTimeout(fetchRoom, waitTime);
+        } else {
+          console.error("Erreur lors du fetch de la room :", error);
+        }
       } finally {
         setLoading(false);
       }
     };
 
     fetchRoom();
-  }, [roomId]);
+       
+  }, []);
 
-  const handleSendMessage = () => {
-    if (newMessage.trim() === "") return;
 
-    const fakeNewMessage = {
-      id: Date.now(), // Juste un id unique local
-      sender: "Moi", // On peut améliorer avec le vrai user plus tard
-      content: newMessage,
-    };
+  useEffect(() => {
+       // Remplace avec ta vraie clé Pusher
+       const pusher = new Pusher("84f95918f7b347312787", {
+        app_id : "1966250",
+        secret : "7ad9e3cbf19e5b49c023",
+        cluster: "eu",
+      });
 
-    setMessages((prevMessages) => [...prevMessages, fakeNewMessage]);
-    setNewMessage(""); // Vide l'input après envoi
+      const channel = pusher.subscribe(`room-${roomId}`);
+
+      channel.bind("message-sent", function (data) {
+        setMessages((prev) => [...prev, data]);
+      });
+
+        // Nettoyage quand on quitte la page
+      return () => {
+        channel.unbind_all();
+        channel.unsubscribe();
+        pusher.disconnect();
+      };
+    
+  }, []);
+
+  const handleSendMessage = async () => {
+    if (message.trim() === "") return;
+
+    try {
+      const response = await postData(`send-message/${roomId}`, { message });
+
+      console.log(response);
+      const newMessage = {
+        id: Date.now(), 
+        sender: response.data.sender.name,
+        content: response.data.content,
+      };
+
+      if(response) {
+        setMessages((prevMessages) => [...prevMessages, newMessage]);
+        setMessage(""); // Vide l'input après envoi
+      } else {
+        console.error("Erreur lors du message :", error);
+      }
+    }catch(error) {
+      console.error("Erreur de la requete ", error);
+    }
+  };
+
+
+  const getInitials = (name) => {
+    if (!name) return "";
+    const words = name.trim().split(" ");
+    if (words.length === 1) return words[0][0];
+    return words[0][0] + words[1][0];
+  };
+  
+  const convertToEmbedUrl = (url) => {
+    const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
+      if (videoIdMatch && videoIdMatch[1]) {
+        return `https://www.youtube.com/embed/${videoIdMatch[1]}?modestbranding=1&rel=0&controls=1&fs=0&disablekb=1`;
+      }
+      return url;
   };
 
   if (loading) return <p>Chargement de la salle...</p>;
@@ -55,28 +120,50 @@ export default function RoomPage({ params }) {
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 p-4">
       {/* Titre de la salle */}
-      <h1 className="text-3xl font-bold text-center mb-6 text-purple-700">
-        {room.name}
-      </h1>
 
       {/* Partie principale */}
       <div className="flex flex-1 gap-6">
         
         {/* Partie vidéo */}
-        <div className="flex-1 bg-white rounded-lg shadow-lg p-4 flex flex-col items-center">
-          <video id="main-video" className="rounded-lg w-full max-w-4xl" controls>
-            <source src={room.current_video?.video || "video-url.mp4"} type="video/mp4" />
-            Votre navigateur ne supporte pas la balise vidéo.
-          </video>
+        <div className="flex-1 bg-white rounded-lg shadow-lg p-4 flex flex-col">
+                {room.current_video?.video ? (
+            <iframe
+              className="rounded-lg w-full max-w-4xl mb-3"
+              height="500"
+              src={convertToEmbedUrl(room.current_video.video)}
+              title="YouTube video player"
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+            ></iframe>
+          ) : (
+            <p>Vidéo non disponible</p>
+          )}
+
+          <div className="w-full text-left mb-6">
+            <h1 className="text-3xl font-bold text-purple-700">{room.current_video.title}</h1>
+            {room.current_video.description && (
+              <p className="text-gray-600 mt-2">{room.current_video.description}</p>
+            )}
+          </div>
 
           {/* Playlist */}
           <div className="mt-6 w-full">
             <h3 className="text-xl font-semibold mb-4">Vidéos Similaires</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {playlist.length > 0 ? (
-                playlist.map((video, index) => (
+              {videos.length > 0 ? (
+                videos.map((video, index) => (
                   <div key={index} className="bg-gray-200 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition">
-                    <img src={video.thumbnail || "/default-thumbnail.jpg"} alt={video.title} className="w-full h-32 object-cover" />
+                     <iframe
+                        className="w-full h-38 object-cover" 
+                        height="100"
+                        src={convertToEmbedUrl(video.video)}
+                        title={video.title}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+
                     <div className="p-2 text-center font-medium">{video.title}</div>
                   </div>
                 ))
@@ -86,6 +173,54 @@ export default function RoomPage({ params }) {
             </div>
           </div>
         </div>
+
+        {/* Partie membres et playlist */}
+          <div className="w-80 flex flex-col gap-4">
+
+            {/* Bloc Membres */}
+            <div className="bg-white rounded-lg shadow-lg p-4 flex flex-col">
+              <h3 className="text-xl font-semibold mb-2 text-purple-700">Host</h3>
+              <p key={host.id} className="text-gray-700">{host.name}</p>
+
+              <div className="mt-6">
+                <h3 className="text-lg font-semibold mb-2 text-purple-700">Membres du salon</h3>
+                <div className="flex flex-wrap gap-2">
+                  {users.slice(0, 9).map((user) => (
+                    <div
+                      key={user.id}
+                      className="w-10 h-10 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold text-sm shadow-md"
+                    >
+                      {getInitials(user.name)}
+                    </div>
+                  ))}
+                  {users.length > 9 && (
+                    <div className="w-10 h-10 rounded-full bg-purple-400 flex items-center justify-center text-white font-bold text-sm shadow-md">
+                      +{users.length - 9}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+              {/* Bloc Playlist */}
+              <div className="bg-white rounded-lg shadow-lg p-4 flex flex-col">
+                <h3 className="text-lg font-semibold mb-2 text-purple-700">Playlist</h3>
+                <div className="space-y-2">
+                  {playlist.length > 0 ? (
+                    playlist.map((video, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <img src={video.thumbnail || "/default-thumbnail.jpg"} alt={video.title} className="w-12 h-12 object-cover rounded" />
+                        <span className="text-gray-700 text-sm">{video.title}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500">Aucune vidéo dans la playlist.</p>
+                  )}
+                </div>
+              </div>
+
+          </div>
+
 
         {/* Partie chat + utilisateurs */}
         <div className="w-80 bg-white rounded-lg shadow-lg p-4 flex flex-col">
@@ -110,8 +245,8 @@ export default function RoomPage({ params }) {
           <div className="flex mt-4">
             <input
               type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
               placeholder="Écris un message..."
               className="flex-1 border border-gray-300 rounded-l px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
@@ -121,20 +256,6 @@ export default function RoomPage({ params }) {
             >
               Envoyer
             </button>
-          </div>
-
-          {/* Utilisateurs connectés */}
-          <div className="mt-6">
-            <h3 className="text-lg font-semibold mb-2 text-purple-700">Utilisateurs</h3>
-            <ul className="space-y-1">
-              {users.length > 0 ? (
-                users.map((user) => (
-                  <li key={user.id} className="text-gray-700">{user.name}</li>
-                ))
-              ) : (
-                <li className="text-gray-500">Aucun utilisateur.</li>
-              )}
-            </ul>
           </div>
 
         </div>
