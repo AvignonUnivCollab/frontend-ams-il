@@ -5,6 +5,7 @@ import { fetchData, postData } from "../../../../services/api";
 import styles from "../../../style/roompage.module.css";
 import YouTubePlayer from "../../components/YouTubePlayer";
 import Pusher from "pusher-js";
+import { FaTrashAlt, FaHeart, FaRegHeart  } from 'react-icons/fa';
 
 export default function RoomPage({ params }) {
   const { roomId } = use(params);
@@ -30,6 +31,7 @@ export default function RoomPage({ params }) {
           setMessages(response.data.messages || []);
           setUsers(response.data.users || []);
           setVideos(response.data.videos || []);
+          setPlaylist(response.data.playlist.videos || []);
           setHost(response.data.host);
         }
       } catch (error) {
@@ -65,6 +67,9 @@ export default function RoomPage({ params }) {
         setMessages((prev) => [...prev, data]);
       });
 
+      channel.bind("video-added", function (data) {
+        setPlaylist((prev) => [...prev, data.video]);
+      });
         // Nettoyage quand on quitte la page
       return () => {
         channel.unbind_all();
@@ -89,7 +94,7 @@ export default function RoomPage({ params }) {
 
       if(response) {
         setMessages((prevMessages) => [...prevMessages, newMessage]);
-        setMessage(""); // Vide l'input après envoi
+        setMessage(""); 
       } else {
         console.error("Erreur lors du message :", error);
       }
@@ -108,18 +113,49 @@ export default function RoomPage({ params }) {
   
   const convertToEmbedUrl = (url) => {
     const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&]+)/);
-      if (videoIdMatch && videoIdMatch[1]) {
-        return `https://www.youtube.com/embed/${videoIdMatch[1]}?modestbranding=1&rel=0&controls=1&fs=0&disablekb=1`;
-      }
-      return url;
+    if (videoIdMatch && videoIdMatch[1]) {
+      return `https://www.youtube.com/embed/${videoIdMatch[1]}?autoplay=0&controls=1&rel=0&showinfo=0&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1`;
+    }
+    return url;
+  };
+
+  const addVideoToPlaylist = async (videoId) => {
+     try {
+      console.log(videoId);
+        const result = await postData(`playlists/add-video/${roomId}`, { videoId });
+        console.log(result);
+
+     }catch(error) {
+      console.error("Erreur de la requete ", error);
+     }
+  };
+
+  
+  const isInPlaylist = (videoId) => {
+    return playlist.some(video => video.id === videoId);
+  };
+
+  
+  const handleRemoveVideo = (videoId) => {
+    setPlaylist(playlist.filter((video) => video.id !== videoId));
   };
 
   if (loading) return <p>Chargement de la salle...</p>;
   if (!room) return <p>Erreur : Salle introuvable.</p>;
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-100 p-4">
+    <div className="flex flex-col min-h-screen bg-gray-100 p-0">
       {/* Titre de la salle */}
+      {/* Navbar secondaire pour quitter la salle */}
+      <div className="w-full bg-white shadow-md p-4 flex items-center justify-between mb-4">
+        <h2 className="text-2xl font-bold text-purple-700"></h2>
+        <button
+          onClick={() => window.location.href = '/'} // redirige vers l'accueil
+          className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded"
+        >
+          Quitter le Salon
+        </button>
+      </div>
 
       {/* Partie principale */}
       <div className="flex flex-1 gap-6">
@@ -140,12 +176,27 @@ export default function RoomPage({ params }) {
             <p>Vidéo non disponible</p>
           )}
 
-          <div className="w-full text-left mb-6">
-            <h1 className="text-3xl font-bold text-purple-700">{room.current_video.title}</h1>
-            {room.current_video.description && (
-              <p className="text-gray-600 mt-2">{room.current_video.description}</p>
-            )}
-          </div>
+            <div className="w-full mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h1 className="text-3xl font-bold text-purple-700">{room.current_video.title}</h1>
+                <button
+                  onClick={() => addVideoToPlaylist(room.current_video.id)}
+                  disabled={isInPlaylist(room.current_video.id)}
+                  className={`text-2xl ${isInPlaylist(room.current_video.id) ? "text-red-500" : "text-gray-400"} hover:text-red-600 transition`}
+                >
+                  {isInPlaylist(room.current_video.id) ? <FaHeart size={24} /> : <FaRegHeart size={24} />}
+                </button>
+              </div>
+
+              {room.current_video.description && (
+                <p className="text-gray-600">{room.current_video.description}</p>
+              )}
+
+              {room.current_video.created_at && (
+                  <i className="mt-2">Publier il ya {room.current_video.created_at} jours</i>
+              )}
+            </div>
+
 
           {/* Playlist */}
           <div className="mt-6 w-full">
@@ -153,7 +204,7 @@ export default function RoomPage({ params }) {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {videos.length > 0 ? (
                 videos.map((video, index) => (
-                  <div key={index} className="bg-gray-200 rounded-lg overflow-hidden shadow-md hover:shadow-lg transition">
+                  <div key={index} className="rounded-lg overflow-hidden shadow-sl hover:shadow-lg transition">
                      <iframe
                         className="w-full h-38 object-cover" 
                         height="100"
@@ -164,7 +215,9 @@ export default function RoomPage({ params }) {
                         allowFullScreen
                       ></iframe>
 
-                    <div className="p-2 text-center font-medium">{video.title}</div>
+                    <div className="mt-3 font-medium bold">{video.title}</div>
+                    <i className="">Publier il ya {video.created_at} jours</i>
+
                   </div>
                 ))
               ) : (
@@ -175,7 +228,7 @@ export default function RoomPage({ params }) {
         </div>
 
         {/* Partie membres et playlist */}
-          <div className="w-80 flex flex-col gap-4">
+          <div className="w-120 flex flex-col gap-4">
 
             {/* Bloc Membres */}
             <div className="bg-white rounded-lg shadow-lg p-4 flex flex-col">
@@ -209,8 +262,26 @@ export default function RoomPage({ params }) {
                   {playlist.length > 0 ? (
                     playlist.map((video, index) => (
                       <div key={index} className="flex items-center gap-2">
-                        <img src={video.thumbnail || "/default-thumbnail.jpg"} alt={video.title} className="w-12 h-12 object-cover rounded" />
+                       <iframe
+                        className="w-small h-18 object-cover" 
+                        width="150"
+                        height="80"
+                        src={convertToEmbedUrl(video.video)}
+                        title={video.title}
+                        frameBorder="0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      ></iframe>
+                          {/* <img src={video.thumbnail || "/default-thumbnail.jpg"} alt={video.title} className="w-12 h-12 object-cover rounded" /> */}
                         <span className="text-gray-700 text-sm">{video.title}</span>
+
+                        {/* Icône de suppression */}
+                      <button
+                        onClick={() => handleRemoveVideo(video.id)} // Appel de la fonction pour supprimer la vidéo
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <FaTrashAlt /> {/* Affichage de l'icône */}
+                      </button>
                       </div>
                     ))
                   ) : (
@@ -233,7 +304,8 @@ export default function RoomPage({ params }) {
                   key={msg.id}
                   className="bg-purple-100 p-2 rounded animate-fade-in"
                 >
-                  <strong>{msg.sender}</strong>: {msg.content}
+                  <strong>{msg.sender}</strong>
+                  <p>{msg.content}</p>
                 </div>
               ))
             ) : (
@@ -252,8 +324,7 @@ export default function RoomPage({ params }) {
             />
             <button
               onClick={handleSendMessage}
-              className="bg-purple-500 hover:bg-purple-600 text-white font-bold px-4 rounded-r"
-            >
+              className="bg-purple-500 hover:bg-purple-600 text-white font-bold px-4 rounded-r">
               Envoyer
             </button>
           </div>
