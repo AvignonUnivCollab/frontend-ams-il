@@ -17,7 +17,8 @@ export default function RoomPage({ params }) {
   const [playlist, setPlaylist] = useState([]);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState(""); // Nouveau message à écrire
+  const [message, setMessage] = useState(""); 
+  const [leaving, setLeaving] = useState({});
 
   useEffect(() => {
     if (!roomId) return;
@@ -56,8 +57,6 @@ export default function RoomPage({ params }) {
   useEffect(() => {
        // Remplace avec ta vraie clé Pusher
        const pusher = new Pusher("84f95918f7b347312787", {
-        app_id : "1966250",
-        secret : "7ad9e3cbf19e5b49c023",
         cluster: "eu",
       });
 
@@ -121,8 +120,8 @@ export default function RoomPage({ params }) {
 
   const addVideoToPlaylist = async (videoId) => {
      try {
-      console.log(videoId);
-        const result = await postData(`playlists/add-video/${roomId}`, { videoId });
+        const video_id = videoId;
+        const result = await postData(`playlists/add-video/${roomId}`, { video_id });
         console.log(result);
 
      }catch(error) {
@@ -131,8 +130,30 @@ export default function RoomPage({ params }) {
   };
 
   
-  const isInPlaylist = (videoId) => {
+  const isInPlaylist = async (videoId) => {
+        const video_id = videoId;
+        const result = await postData(`playlists/remove-video/${roomId}`, { video_id });
+        console.log(result);
     return playlist.some(video => video.id === videoId);
+  };
+
+
+  // Leave a room
+  const leaveRoom = async (roomId) => {
+    try {
+      setLeaving((prev) => ({ ...prev, [roomId]: true }));
+      const result = await postData(`room/${roomId}/leave`); // Send request to leave the room
+      if (result && result.data != null) {
+        
+      } else {
+        throw new Error("Failed to leave room");
+      }
+    } catch (error) {
+      console.error("Error leaving room", error);
+      setError("Failed to leave room");
+    } finally {
+      setLeaving((prev) => ({ ...prev, [roomId]: false }));
+    }
   };
 
   
@@ -215,7 +236,16 @@ export default function RoomPage({ params }) {
                         allowFullScreen
                       ></iframe>
 
-                    <div className="mt-3 font-medium bold">{video.title}</div>
+                    <div className="flex justify-between mt-3">
+                      <h1 className="font-medium bold">{video.title}</h1>
+                      <button
+                        onClick={() => addVideoToPlaylist(video.id)}
+                        disabled={isInPlaylist(video.id)}
+                        className={`text-2xl ${isInPlaylist(video.id) ? "text-red-500" : "text-gray-400"} hover:text-red-600 transition`}
+                      >
+                        {isInPlaylist(video.id) ? <FaHeart size={24} /> : <FaRegHeart size={24} />}
+                      </button>
+                    </div>
                     <i className="">Publier il ya {video.created_at} jours</i>
 
                   </div>

@@ -49,7 +49,13 @@ export const postData = async(endpoint, data) => {
         }
 
         if(!response.ok) {
-          throw new Error(result.message ||`Error: ${response.statusText}`);
+          const text = await response.text(); // Pas .json() directement
+          console.error("Server responded with:", text);
+          throw new Error(`HTTP error ${response.status}`);
+        }
+
+        if (!response.ok) {
+        
         }
 
         return result;
