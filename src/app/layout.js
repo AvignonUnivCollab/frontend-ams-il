@@ -46,6 +46,8 @@ export default function RootLayout({ children }) {
     router.push("/login");
   };
 
+  
+
   return (
     <html lang="en">
       <body
