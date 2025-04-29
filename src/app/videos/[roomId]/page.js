@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useState, use } from "react";
 import { fetchData, postData } from "../../../../services/api"; 
 import styles from "../../../style/roompage.module.css";
@@ -17,8 +18,9 @@ export default function RoomPage({ params }) {
   const [playlist, setPlaylist] = useState([]);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState(""); 
   const [leaving, setLeaving] = useState({});
+  const [message, setMessage] = useState(""); // Nouveau message à écrire
+  const router = useRouter();
 
   useEffect(() => {
     if (!roomId) return;
@@ -55,31 +57,34 @@ export default function RoomPage({ params }) {
 
 
   useEffect(() => {
-       // Remplace avec ta vraie clé Pusher
-       const pusher = new Pusher("84f95918f7b347312787", {
-        cluster: "eu",
-      });
+      const pusher = new Pusher("84f95918f7b347312787", {cluster: "eu"});
 
       const channel = pusher.subscribe(`room-${roomId}`);
 
       channel.bind("message-sent", function (data) {
+        console.log(data);
         setMessages((prev) => [...prev, data]);
       });
 
-      channel.bind("video-added", function (data) {
+      const secondChanel = pusher.subscribe(`playlist-${roomId}`);
+
+      secondChanel.bind("video-add-playlist", function (data) {
+        console.log(data);
         setPlaylist((prev) => [...prev, data.video]);
       });
+
         // Nettoyage quand on quitte la page
       return () => {
         channel.unbind_all();
         channel.unsubscribe();
+        secondChanel.unbind_all();
+        secondChanel.unsubscribe();
         pusher.disconnect();
       };
     
   }, []);
 
   const handleSendMessage = async () => {
-    if (message.trim() === "") return;
 
     try {
       const response = await postData(`send-message/${roomId}`, { message });
@@ -92,10 +97,7 @@ export default function RoomPage({ params }) {
       };
 
       if(response) {
-        setMessages((prevMessages) => [...prevMessages, newMessage]);
-        setMessage(""); 
-      } else {
-        console.error("Erreur lors du message :", error);
+        setMessages((prevMessages) => [...prevMessages, response.data]);
       }
     }catch(error) {
       console.error("Erreur de la requete ", error);
@@ -124,57 +126,67 @@ export default function RoomPage({ params }) {
         const result = await postData(`playlists/add-video/${roomId}`, { video_id });
         console.log(result);
 
+        const video = videos.find((item) => item.id == videoId);
+        console.log(video);
+        setPlaylist((prevVideos) => [...prevVideos, video]);
      }catch(error) {
       console.error("Erreur de la requete ", error);
      }
   };
 
   
-  const isInPlaylist = async (videoId) => {
-        const video_id = videoId;
-        const result = await postData(`playlists/remove-video/${roomId}`, { video_id });
-        console.log(result);
+  const isInPlaylist = (videoId) => {
     return playlist.some(video => video.id === videoId);
   };
 
-
-  // Leave a room
-  const leaveRoom = async (roomId) => {
-    try {
-      setLeaving((prev) => ({ ...prev, [roomId]: true }));
-      const result = await postData(`room/${roomId}/leave`); // Send request to leave the room
-      if (result && result.data != null) {
-        
-      } else {
-        throw new Error("Failed to leave room");
-      }
-    } catch (error) {
-      console.error("Error leaving room", error);
-      setError("Failed to leave room");
-    } finally {
-      setLeaving((prev) => ({ ...prev, [roomId]: false }));
-    }
-  };
-
   
-  const handleRemoveVideo = (videoId) => {
-    setPlaylist(playlist.filter((video) => video.id !== videoId));
+  const handleRemoveVideo = async (videoId) => {
+    try {
+      const video_id = videoId;
+      const result = await postData(`playlists/remove-video/${roomId}`, { video_id });
+      console.log(result);
+      setPlaylist(playlist.filter((video) => video.id !== videoId));
+
+   }catch(error) {
+    console.error("Erreur de la requete ", error);
+   }
   };
 
-  if (loading) return <p>Chargement de la salle...</p>;
+
+    // Leave a room
+    const leaveRoom = async (roomId) => {
+      try {
+        setLeaving((prev) => ({ ...prev, [roomId]: true }));
+        const result = await postData(`room/${roomId}/leave`); // Send request to leave the room
+        if (result && result.data != null) {
+          router.replace('/rooms');
+        } else {
+          throw new Error("Failed to leave room");
+        }
+      } catch (error) {
+        console.error("Error leaving room", error);
+      } finally {
+        setLeaving((prev) => ({ ...prev, [roomId]: false }));
+      }
+    };
+
   if (!room) return <p>Erreur : Salle introuvable.</p>;
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 p-0">
+      {loading && (
+        <div className="fixed inset-0 flex justify-center items-center bg-white/70 z-50">
+          <div className="animate-spin rounded-full h-20 w-20 border-8 border-yellow-500 border-t-transparent"></div>
+        </div>
+      )}
       {/* Titre de la salle */}
       {/* Navbar secondaire pour quitter la salle */}
       <div className="w-full bg-white shadow-md p-4 flex items-center justify-between mb-4">
         <h2 className="text-2xl font-bold text-purple-700"></h2>
         <button
-          onClick={() => window.location.href = '/'} // redirige vers l'accueil
-          className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded"
-        >
-          Quitter le Salon
+          onClick={() => leaveRoom(room.id)} // redirige vers l'accueil
+          className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded" >
+          {leaving[room.id]? "In Progress..."  : "Quitter le Salon"}
         </button>
       </div>
 
@@ -228,7 +240,7 @@ export default function RoomPage({ params }) {
                   <div key={index} className="rounded-lg overflow-hidden shadow-sl hover:shadow-lg transition">
                      <iframe
                         className="w-full h-38 object-cover" 
-                        height="100"
+                        height="130"
                         src={convertToEmbedUrl(video.video)}
                         title={video.title}
                         frameBorder="0"
@@ -293,7 +305,7 @@ export default function RoomPage({ params }) {
                     playlist.map((video, index) => (
                       <div key={index} className="flex items-center gap-2">
                        <iframe
-                        className="w-small h-18 object-cover" 
+                        className="rounded-lg w-small h-18 object-cover" 
                         width="150"
                         height="80"
                         src={convertToEmbedUrl(video.video)}
@@ -329,9 +341,9 @@ export default function RoomPage({ params }) {
           <h3 className="text-xl font-semibold mb-2 text-purple-700">Messages</h3>
           <div className="flex-1 overflow-y-auto space-y-3 p-2">
             {messages.length > 0 ? (
-              messages.map((msg) => (
+              messages.map((msg, index) => (
                 <div
-                  key={msg.id}
+                  key={index}
                   className="bg-purple-100 p-2 rounded animate-fade-in"
                 >
                   <strong>{msg.sender}</strong>
