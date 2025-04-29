@@ -22,8 +22,6 @@ function App() {
   const [password, setPassword] = useState("");
   const [pseudo, setPseudo] = useState(null);
   const [input, setInput] = useState("");
-  const videoRef = useRef(null);
-
   const [isFirstUser, setIsFirstUser] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [closingRoom, setClosingRoom] = useState(false);
@@ -37,9 +35,10 @@ function App() {
   const [videoURL, setVideoURL] = useState("");
   const [videoFile, setVideoFile] = useState(null);
   const [videoSrc, setVideoSrc] = useState("");
+  const [syncing, setSyncing] = useState(false);
   const videoId = extractYouTubeID(videoSrc);
   const isYouTube = Boolean(videoId);
-  const playerRef = useRef(null);
+  const mediaRef = useRef(null);
   const resetStates = useCallback(() => {
     setShowChat(false); 
     setIsFirstUser(false);
@@ -56,6 +55,13 @@ function App() {
     }
     connectWebSocket();
   });
+
+  useEffect(() => {
+    const pathParts = window.location.pathname.split('/');
+    if (pathParts[1] === "room" && pathParts[2]) {
+      setCurrentRoomId(pathParts[2]); // roomId dans l'URL → état React
+    }
+  }, []);
 
   const connectWebSocket = useCallback(() => {
     const ws = new WebSocket("ws://localhost:8080");
@@ -95,8 +101,24 @@ function App() {
           break;
 
           case "video-sync":
-          if (playerRef.current) {
-            const video = playerRef.current;
+            if (mediaRef.current) {
+              setSyncing(true);
+              const vid = mediaRef.current;
+              if (data.isPlaying) vid.play();
+              else                vid.pause();
+
+              const now = vid.getCurrentTime();
+              if (Math.abs(now - data.currentTime) > 0.5) {
+                vid.seekTo(data.currentTime);
+              }
+
+              setIsPlaying(data.isPlaying);
+              setTimeout(() => setSyncing(false), 0);
+            }
+          break;
+
+          if (mediaRef.current) {
+            const video = mediaRef.current;
 
             const syncVideo = async () => {
               try {
@@ -147,6 +169,18 @@ function App() {
   }, [closingRoom, resetStates]);
 
   useEffect(() => {
+    if (!socket || !currentRoomId || !isLoggedIn) return;
+  
+    socket.send(JSON.stringify({
+      type: "join",
+      userId: username,
+      pseudo: pseudo,
+      roomId: currentRoomId,
+      createNew: false // ⚠️ très important : on ne recrée PAS la room
+    }));
+  }, [socket, currentRoomId, isLoggedIn]);  
+
+  useEffect(() => {
     connectWebSocket();
   }, []);
 
@@ -159,51 +193,6 @@ function App() {
     }, 3000);
     return () => clearInterval(id);
   }, [socket]);
-
-  const onYouTubeIframeAPIReady = () => {
-    if (window.YT) {
-      const onPlayerStateChange = (event) => {
-        if (event.data === window.YT.PlayerState.PLAYING) {
-          setIsPlaying(true);
-        } else {
-          setIsPlaying(false);
-        }
-      };
-
-      const player = new window.YT.Player('player', {
-        videoId: videoId,
-        events: {
-          'onStateChange': onPlayerStateChange,
-        },
-      });
-    }
-  };
-
-  useEffect(() => {
-    if (!videoId) return;
-    window.onYouTubeIframeAPIReady = () => {
-      if (playerRef.current) {
-        playerRef.current.destroy();
-        playerRef.current = null;
-      }
-      playerRef.current = new window.YT.Player("yt-player", {
-        videoId,
-        playerVars: { autoplay: 0, controls: 0 },
-        events: {
-          onStateChange: e => {
-            setIsPlaying(e.data === window.YT.PlayerState.PLAYING);
-          }
-        }
-      });
-    };
-    const tag = document.createElement("script");
-    tag.src = "https://www.youtube.com/iframe_api";
-    document.body.appendChild(tag);
-    return () => {
-      document.body.removeChild(tag);
-      window.onYouTubeIframeAPIReady = null;
-    };
-  }, [videoId]);
 
   const generatePseudo = () => `user_${Math.floor(Math.random() * 100000)}`;
   
@@ -249,6 +238,7 @@ function App() {
   
     const newRoomId = `room_${Date.now()}`;
     setCurrentRoomId(newRoomId);
+    window.history.pushState(null, "", `/room/${newRoomId}`);
   
     let final;
     final = videoURL;
@@ -307,27 +297,26 @@ function App() {
 
   const containerRef = useRef(null);
 
-  const togglePlayPause = useCallback(async () => {
-    if (!playerRef.current) return;
-    const player = playerRef.current;
-    if (player.getPlayerState() === window.YT.PlayerState.PLAYING) {
-      player.pauseVideo();
-      socket.send(JSON.stringify({
-        type: "video-sync",
-        isPlaying: false,
-        currentTime: player.getCurrentTime(),
-        roomId: currentRoomId
-      }));
+  const togglePlayPause = useCallback(() => {
+    if (!mediaRef.current) return;
+    if (syncing) return;
+    const now = mediaRef.current.getCurrentTime();
+    const next = !isPlaying;
+    if (next) {
+      mediaRef.current.play();
     } else {
-      player.playVideo();
-      socket.send(JSON.stringify({
-        type: "video-sync",
-        isPlaying: true,
-        currentTime: player.getCurrentTime(),
-        roomId: currentRoomId
-      }));
+      mediaRef.current.pause();
     }
-  }, [socket, currentRoomId]);
+  
+    setIsPlaying(next);
+  
+    socket.send(JSON.stringify({
+      type: "video-sync",
+      isPlaying: next,
+      currentTime: now,
+      roomId: currentRoomId
+    }));
+  }, [socket, currentRoomId, isPlaying]);
 
   const closeRoom = () => {
     if (socket?.readyState === WebSocket.OPEN && currentRoomId) {
@@ -354,7 +343,6 @@ function App() {
 
   const toggleFullScreen = () => {
     if (!containerRef.current) return;
-    // doit être déclenché par un clic utilisateur pour marcher :contentReference[oaicite:4]{index=4}
     if (!document.fullscreenElement) {
       containerRef.current
         .requestFullscreen()
@@ -370,9 +358,7 @@ const handleQualityChange = (e) => {
 };
 
 const handleSpeedChange = (e) => {
-  if (videoRef.current) {
-    videoRef.current.playbackRate = parseFloat(e.target.value);
-  }
+  //Nothing much more here
 };
 
   const handleKeyDown = (e) => {
@@ -410,7 +396,7 @@ const handleSpeedChange = (e) => {
                   <div className="video-container">
                     {videoSrc ? (
                       <YouTubePlayer
-                      ref={containerRef}
+                      ref={mediaRef}
                       src={videoSrc}
                       isOwner={isFirstUser}
                       playing={isPlaying}
