@@ -1,9 +1,7 @@
-"use client";  
-
+"use client";
 import { useState } from "react";
 import { postData } from "../../../services/api";
 import { useRouter } from 'next/navigation';
-
 
 export default function Login() {
   const [username, setUsername] = useState(""); 
@@ -15,29 +13,30 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-
-    const result = await postData("login", { username, password });
-    //console.log("Login result: ", result);
-    console.log(localStorage.getItem("user"));
-
-    if (result) {
-    
-       localStorage.setItem("token", result.data.token);
-       localStorage.setItem("user", result.data.user);
-       const user = localStorage.getItem("user");
-       console.log(user);
-
-       localStorage.setItem("isAuthenticated", true);
-       console.log(localStorage.getItem("user"));
-       router.push("/rooms"); 
-    } 
-    
-    if(!result) {
-      setError("Erreur d'authentification : " + (error.response?.data?.message || "Une erreur est survenue"));
-      localStorage.setItem("isAuthenticated", false);
+    setError("");
+  
+    try {
+      const result = await postData("login", { username, password });
+      
+      if (!result?.success) {
+        throw new Error(result?.message || "Échec de la connexion");
+      }
+  
+      // Conversion correcte en JSON avant stockage
+      localStorage.setItem("token", result.data.token);
+      localStorage.setItem("username", result.data.user.username);
+      localStorage.setItem("user", JSON.stringify(result.data.user)); // ✅ Conversion en JSON
+      
+      // Solution de redirection optimale
+      window.location.href = "/rooms"; // Garantit le rechargement
+      
+    } catch (err) {
+      console.error("Erreur de connexion:", err);
+      setError(err.message);
+      localStorage.clear();
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
