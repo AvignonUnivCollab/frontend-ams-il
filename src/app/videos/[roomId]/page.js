@@ -343,7 +343,7 @@ export default function RoomPage({ params }) {
             {messages.length > 0 ? (
               messages.map((msg, index) => (
                 <div
-                  key={index}
+                  key={msg.created_at}
                   className="bg-purple-100 p-2 rounded animate-fade-in"
                 >
                   <strong>{msg.sender}</strong>

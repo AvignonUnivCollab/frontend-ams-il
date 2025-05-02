@@ -89,7 +89,10 @@ export default function Rooms() {
     }
   };
 
-  
+
+  const viewRoom = (roomId) => { router.push(`/videos/${roomId}`); };
+
+
   return (
     <div className="container mx-auto p-4 mt-3">
       {loading && (
@@ -98,23 +101,6 @@ export default function Rooms() {
         </div>
       )}
 
-      <div className="mb-4 flex justify-between items-center">
-        {/* recherche bar */}
-        <div className="flex items-center space-x-2">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by ID or Name"
-            className="p-2 border border-gray-300 rounded-lg w-64"
-          />
-        </div>
-
-        {/* boutton cree room */}
-        <Link href="\creatroom" className="bg-yellow-400 text-black font-bold py-3 px-6 rounded-lg text-lg mt-4">
-        Create Room
-      </Link>
-      </div>
 
       {!loading && filteredRooms.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -135,22 +121,31 @@ export default function Rooms() {
               <i className="text-white text-sm mb-3">
                 {room.video_count} videos • {room.user_count} users • {room.message_count} messages
               </i>
-              <button
-                className={`${
-                  room.is_joined ? "bg-red-500 hover:bg-red-600" : "bg-yellow-500 hover:bg-yellow-600"
-                } text-black p-2 rounded-lg w-full`}
-                onClick={() =>
-                  room.is_joined ? leaveRoom(room.id) : joinRoom(room.id)
-                }
-              >
-                {room.is_joined
-                  ? leaving[room.id]
-                    ? "In Progress..."
-                    : "Leave"
-                  : sending[room.id]
-                    ? "In Progress..."
-                    : "Join"}
-              </button>
+              
+              {room.is_joined ? (
+                    <div className="flex gap-2">
+                      <button
+                        className="bg-red-500 hover:bg-red-600 text-black p-2 rounded-lg w-full"
+                        onClick={() => leaveRoom(room.id)}
+                      >
+                        {leaving[room.id] ? "In Progress..." : "Leave"}
+                      </button>
+                      <button
+                        className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-lg w-full"
+                        onClick={() => viewRoom(room.id)}
+                      >
+                        Voir
+                      </button>
+                    </div>
+                ) : (
+                  <button
+                    className="bg-yellow-500 hover:bg-yellow-600 text-black p-2 rounded-lg w-full"
+                    onClick={() => joinRoom(room.id)}
+                  >
+                    {sending[room.id] ? "In Progress..." : "Join"}
+                  </button>
+                )}
+
             </div>
           ))}
         </div>
