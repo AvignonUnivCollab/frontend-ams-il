@@ -1,151 +1,147 @@
-const WebSocket = require("ws");
-const userSessions = new Map();
-const server = new WebSocket.Server({ port: 8080 });
-const roomInfos = new Map();
-const roomStates = new Map();
+// server.js
+const http = require("http");
+const express = require("express");
+const { Server } = require("socket.io");
 
-server.on("connection", (ws, req) => {
-  const clientIp = req.socket.remoteAddress;
-  console.log(`Client connecté depuis ${clientIp}`);
+const app = express();
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, { cors: { origin: "*" } });
 
-  let userId = null;
-  let pseudo = null;
-  let roomId = null;
+/** Structure des salons :
+ * rooms[roomId] = {
+ *   ownerId: socket.id,
+ *   meta: { name, desc, url, source },
+ *   users: Set<socket.id>,
+ *   closed: boolean,
+ *   state: { isPlaying: boolean, currentTime: number }
+ * }
+ */
+let rooms = {};
 
-  ws.on("message", (rawData) => {
-    let data;
-    try {
-      data = JSON.parse(rawData);
-    } catch (err) {
-      broadcastMessage(`[${clientIp}] ${rawData}`, roomId);
+function broadcastRoomsList() {
+  const list = Object.entries(rooms)
+    .filter(([_, r]) => !r.closed)
+    .map(([id, r]) => ({ id, meta: r.meta }));
+  io.emit("rooms-list", list);
+}
+
+io.on("connection", (socket) => {
+  console.log(`🔌 Client connecté: ${socket.id}`);
+
+  // 1) Demande/rafraîchissement liste salons
+  socket.on("get-rooms", broadcastRoomsList);
+
+  // 2) Création de salon
+  socket.on("create-room", ({ roomId, meta }) => {
+    rooms[roomId] = {
+      ownerId: socket.id,
+      meta,
+      users: new Set([socket.id]),
+      closed: false,
+      state: { isPlaying: false, currentTime: 0 },
+    };
+    socket.join(roomId);
+    socket.emit("room-created", { roomId, meta });
+    broadcastRoomsList();
+    console.log("🏠 create-room:", roomId, meta);
+  });
+
+  // 3) Rejoindre salon
+  socket.on("join-room", ({ roomId, pseudo }) => {
+    const room = rooms[roomId];
+    if (!room || room.closed) {
+      socket.emit("room-error", "Salon introuvable ou fermé");
       return;
     }
+    // si vide → nouveau propriétaire
+    if (room.users.size === 0) {
+      room.ownerId = socket.id;
+      io.to(roomId).emit("new-owner", { newOwnerId: socket.id });
+    }
+    room.users.add(socket.id);
+    socket.join(roomId);
 
-    switch (data.type) {
-      case "getRooms":
-        const rooms = [...new Set(Array.from(userSessions.values()).map(session => session.roomId))];
-        ws.send(JSON.stringify({ roomsList: rooms }));
-        break;
+    // renvoyer meta + état vidéo
+    socket.emit("room-created", { roomId, meta: room.meta });
+    socket.emit("video-sync", room.state);
 
-      case "join":
-          userId = data.userId;
-          pseudo  = data.pseudo || `User_${Math.floor(Math.random()*10000)}`;
-          roomId  = data.roomId || "default";
-        
-          const isFirst = ![...userSessions.values()].some(s => s.roomId === roomId);
-        
-          if (data.createNew) {
-            roomInfos.set(roomId, {
-              roomName:        data.roomName,
-              roomDescription: data.roomDescription,
-              videoURL:        data.videoURL
-            });
-            ws.send(JSON.stringify({ type: "firstUser" }));
-            broadcastJSON({
-              type:            "room-info",
-              roomName:        data.roomName,
-              roomDescription: data.roomDescription,
-              videoURL:        data.videoURL
-            }, roomId);
-        
-          } else {
-            const info = roomInfos.get(roomId);
-            if (info) {
-              ws.send(JSON.stringify({
-                type:            "room-info",
-                roomName:        info.roomName,
-                roomDescription: info.roomDescription,
-                videoURL:        info.videoURL
-              }));
-              const state = roomStates.get(roomId);
-              if (state) {
-                ws.send(JSON.stringify({
-                  type:        "video-sync",
-                  isPlaying:   state.isPlaying,
-                  currentTime: state.currentTime
-                }));
-              }
-            }
-          }
-        
-          userSessions.set(userId, { ws, pseudo, roomId });
-          broadcastMessage(`${pseudo} a rejoint la salle.`, roomId);
-      break;
+    io.to(roomId).emit("user-joined", { pseudo, userId: socket.id });
+    console.log("🔗 join-room:", pseudo, "=>", roomId);
+  });
 
-      case "message":
-        if (pseudo && data.message) {
-          broadcastMessage(`[${pseudo}] ${data.message}`, roomId);
-        }
-      break;
+  // 4) Quitter salon
+  socket.on("leave-room", ({ roomId, pseudo }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    room.users.delete(socket.id);
+    socket.leave(roomId);
+    io.to(roomId).emit("user-left", { pseudo });
 
-      case "video-sync":
-        roomStates.set(roomId, {
-          isPlaying: data.isPlaying,
-          currentTime: data.currentTime
-          });
-        broadcastJSON(
-          {
-            type: "video-sync",
-            isPlaying: data.isPlaying,
-            currentTime: data.currentTime,
-          },
-          roomId
-        );
-      break;
+    // réassigner si proprio part
+    if (room.ownerId === socket.id) {
+      const next = Array.from(room.users.values())[0];
+      if (next) {
+        room.ownerId = next;
+        io.to(roomId).emit("new-owner", { newOwnerId: next });
+      }
+    }
+    console.log("🚪 leave-room:", pseudo, roomId);
+  });
 
-      case "quit":
-        if (data.userId && userSessions.has(data.userId)) {
-          userSessions.delete(data.userId);
-          broadcastMessage(`${data.pseudo} a quitté la room sans la fermer.`, roomId);
-        }
-      break;
+  // 5) Chat
+  socket.on("message", ({ roomId, pseudo, text }) => {
+    io.to(roomId).emit("message", { pseudo, text, time: Date.now() });
+    console.log("✉️ message:", pseudo, text);
+  });
 
-      case 'close-room':
-        broadcastJSON({ type: 'room-closing', message: 'Le salon va fermer dans 5 secondes.' }, roomId);
-        setTimeout(() => {
-          broadcastJSON({ type: 'room-closed', message: 'La room a été fermée par le propriétaire.' }, roomId);
-          for (let [uid, session] of userSessions.entries()) {
-            if (session.roomId === roomId) {
-              session.ws.close();
-              userSessions.delete(uid);
-            }
-          }
-          console.log(`>>> Room ${roomId} fermée, sessions vidées et connexions fermées <<<`);
-        }, 3000);
-      break;
-          
-      default:
-        console.log("Type de message inconnu :", data);
-        break;
+  // 6) Synchronisation vidéo
+  socket.on("video-sync", ({ roomId, isPlaying, currentTime }) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    // seul le proprio peut émettre
+    if (socket.id !== room.ownerId) {
+      console.warn("⚠️ Ignoré video-sync d’un non-owner", socket.id);
+      return;
+    }
+    room.state = { isPlaying, currentTime };
+    io.to(roomId).emit("video-sync", room.state);
+    console.log("📡 video-sync reçu:", roomId, room.state);
+  });
+
+  // 7) Fermeture salon
+  socket.on("close-room", (roomId) => {
+    const room = rooms[roomId];
+    if (room && socket.id === room.ownerId) {
+      room.closed = true;
+      io.to(roomId).emit("room-closed", "Le maître a fermé la room");
+      broadcastRoomsList();
+      setTimeout(() => {
+        delete rooms[roomId];
+        io.in(roomId).socketsLeave(roomId);
+        broadcastRoomsList();
+      }, 5000);
+      console.log("🔒 close-room:", roomId);
     }
   });
 
-  ws.on("close", () => {
-    console.log(`Client déconnecté: ${clientIp}`);
-    if (userId && userSessions.has(userId)) {
-      broadcastMessage(`${pseudo} a quitté la salle de discussion.`, roomId);
-      userSessions.delete(userId);
+  // 8) Déconnexion brusque
+  socket.on("disconnecting", () => {
+    for (let rid of socket.rooms) {
+      const room = rooms[rid];
+      if (room) {
+        room.users.delete(socket.id);
+        if (room.ownerId === socket.id && !room.closed) {
+          room.closed = true;
+          io.to(rid).emit("room-closed", "Le maître a quitté, salon fermé");
+          broadcastRoomsList();
+          delete rooms[rid];
+        }
+      }
     }
+    console.log(`❌ Client déconnecté: ${socket.id}`);
   });
 });
 
-function broadcastMessage(message, roomId) {
-  console.log(">> broadcastMessage:", message);
-  for (let session of userSessions.values()) {
-    if (session.roomId === roomId && session.ws.readyState === WebSocket.OPEN) {
-      session.ws.send(JSON.stringify({ message }));
-    }
-  }
-}
-
-function broadcastJSON(obj, roomId) {
-  const jsonString = JSON.stringify(obj);
-  console.log(">> broadcastJSON:", jsonString);
-  for (let session of userSessions.values()) {
-    if (session.roomId === roomId && session.ws.readyState === WebSocket.OPEN) {
-      session.ws.send(jsonString);
-    }
-  }
-}
-
-console.log("Serveur WebSocket lancé sur le port 8080.")
+httpServer.listen(8080, () =>
+  console.log("⚡️ Socket.IO server sur :8080")
+);
