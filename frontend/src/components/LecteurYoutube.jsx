@@ -1,112 +1,145 @@
 /* global YT */
-import React, { useRef, useEffect, useState } from "react";
-import { loadYouTubeAPI } from '../utils/youtubeApiLoader';
+import React, { useRef, useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
+import './LecteurYoutube.css';
 
-export default function LecteurYoutube({
-  url,
-  socket,
-  roomId,
-  isOwner,
-  playerRef
-}) {
-  const iframeRef = useRef(null);
-  const [ready, setReady] = useState(false);
-  const [playing, setPlaying] = useState(false);
-  const [time, setTime] = useState(0);
+// Charge l’API YouTube IFrame une seule fois
+let apiLoading = false;
+let apiReady   = false;
+const apiQueue = [];
+function loadYouTubeAPI(cb) {
+  if (apiReady) return void cb();
+  apiQueue.push(cb);
+  if (apiLoading) return;
+  apiLoading = true;
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  document.body.appendChild(tag);
+  window.onYouTubeIframeAPIReady = () => {
+    apiReady = true;
+    apiQueue.splice(0).forEach(fn => fn());
+  };
+}
 
-  // 1) Initialise le player une fois
+// Extraction d'ID YouTube
+function extractVideoID(url) {
+  const m = url.match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/);
+  return m ? m[1] : null;
+}
+
+export default function LecteurYoutube({ url, socket, roomId, isOwner }) {
+  const containerRef = useRef(null);
+  const playerRef    = useRef(null);
+
+  const [ready, setReady]       = useState(false);
+  const [playing, setPlaying]   = useState(false);
+  const [currentTime, setTime]  = useState(0);
+  const [duration, setDuration] = useState(0);
+
   useEffect(() => {
-    loadYouTubeAPI(() => {
-      const id = extractVideoID(url);
-      if (!id) return console.error("URL YouTube invalide :", url);
+    const id = extractVideoID(url);
+    if (!id) return console.error('URL YouTube invalide :', url);
 
-      const player = new YT.Player(iframeRef.current, {
+    loadYouTubeAPI(() => {
+      containerRef.current.innerHTML = '';
+      const iframeContainer = document.createElement('div');
+      containerRef.current.appendChild(iframeContainer);
+
+      playerRef.current = new YT.Player(iframeContainer, {
         videoId: id,
-        width: "100%",
-        height: "360",
         playerVars: {
-          controls: 0,       // cache l'UI native
-          disablekb: 1,      // désactive le clavier
+          enablejsapi:    1,
+          controls:       0,
+          disablekb:      1,
           modestbranding: 1,
-          rel: 0
+          rel:            0
         },
         events: {
-          onReady: () => {
-            playerRef.current = player;
+          onReady: e => {
             setReady(true);
+            const dur = e.target.getDuration();
+            setDuration(dur);
+
+            e.target.playVideo();
+            setTimeout(() => e.target.pauseVideo(), 200);
+
+            if (!isOwner) socket.emit('request-sync', { roomId });
           },
-          onStateChange: ({ data }) => {
-            if (!isOwner && data === YT.PlayerState.PLAYING) setPlaying(true);
-            if (!isOwner && data === YT.PlayerState.PAUSED)  setPlaying(false);
+          onStateChange: ({ data, target }) => {
+            const t = target.getCurrentTime();
+            setTime(t);
+            const isPlay = data === YT.PlayerState.PLAYING;
+            setPlaying(isPlay);
+
+            if (isOwner) {
+              socket.emit('video-sync', {
+                roomId,
+                isPlaying: isPlay,
+                currentTime: t
+              });
+            }
           }
         }
       });
     });
-  }, [url, playerRef, isOwner]);
+  }, [url, roomId, isOwner, socket]);
 
-  // 2) Écoute le socket “video-sync” pour forcer la sync
   useEffect(() => {
     if (!socket) return;
-    socket.on("video-sync", ({ isPlaying, currentTime }) => {
-      if (!playerRef.current) return;
-      // repositionne d’abord
-      playerRef.current.seekTo(currentTime, true);
-      // puis play/pause
-      if (isPlaying) playerRef.current.playVideo();
-      else           playerRef.current.pauseVideo();
+    const handler = ({ isPlaying, currentTime }) => {
+      const pl = playerRef.current;
+      if (!pl || typeof pl.seekTo !== 'function') return;
+      pl.seekTo(currentTime, true);
+      isPlaying ? pl.playVideo() : pl.pauseVideo();
       setPlaying(isPlaying);
       setTime(currentTime);
-    });
-    return () => socket.off("video-sync");
-  }, [socket, playerRef]);
+    };
+    socket.on('video-sync', handler);
+    return () => socket.off('video-sync', handler);
+  }, [socket]);
 
-  // 3) Fonctions propriétaires ▶ émettent immédiatement
-  const handlePlay = () => {
-    playerRef.current.playVideo();
-    const ct = playerRef.current.getCurrentTime();
-    socket.emit("video-sync", { roomId, isPlaying: true, currentTime: ct });
-    setPlaying(true);
-    setTime(ct);
+  const post = (func, args=[]) => {
+    const iframe = containerRef.current.querySelector('iframe');
+    if (!iframe) return;
+    iframe.contentWindow.postMessage(
+      JSON.stringify({ event: 'command', func, args }), '*'
+    );
   };
-  const handlePause = () => {
-    playerRef.current.pauseVideo();
-    const ct = playerRef.current.getCurrentTime();
-    socket.emit("video-sync", { roomId, isPlaying: false, currentTime: ct });
-    setPlaying(false);
-    setTime(ct);
-  };
-  const handleSeek = e => {
-    const newTime = parseFloat(e.target.value);
-    playerRef.current.seekTo(newTime, true);
-    socket.emit("video-sync", { roomId, isPlaying: playing, currentTime: newTime });
-    setTime(newTime);
+  const handlePlay  = () => post('playVideo');
+  const handlePause = () => post('pauseVideo');
+  const handleSeek  = e => {
+    const t = parseFloat(e.target.value);
+    post('seekTo', [t, true]);
+    setTime(t);
+    if (isOwner) {
+      socket.emit('video-sync', { roomId, isPlaying: playing, currentTime: t });
+    }
   };
 
   return (
-    <div className="yt-player-custom" style={{ width: "100%" }}>
-      <div ref={iframeRef} style={{ width: "100%", height: "360px" }} />
-      
-      {/* Contrôles perso */}
+    <div className="custom-yt-player">
+      {/* zone vidéo + click-blocker */}
+      <div className="player-container">
+        <div ref={containerRef} className="player-frame"/>
+        <div className="click-blocker"/>
+      </div>
+
+      {/* contrôles personnalisés */}
       {ready && (
-        <div className="yt-controls-custom" style={{ padding: "8px", textAlign: "center" }}>
+        <div className="controls">
           {isOwner ? (
             <>
-              <button onClick={handlePlay}  style={{ margin: "0 4px" }}>Play</button>
-              <button onClick={handlePause} style={{ margin: "0 4px" }}>Pause</button>
+              <button onClick={handlePlay}  disabled={playing}>Play</button>
+              <button onClick={handlePause} disabled={!playing}>Pause</button>
               <input
                 type="range"
-                min="0"
-                max="100"
-                step="0.1"
-                value={time}
-                onChange={handleSeek}
-                style={{ width: "60%", verticalAlign: "middle", margin: "0 8px" }}
+                min="0" max={duration} step="0.1"
+                value={currentTime} onChange={handleSeek}
               />
+              <span>{Math.floor(currentTime)}/{Math.floor(duration)}s</span>
             </>
           ) : (
-            <button disabled style={{ margin: "0 4px", opacity: 0.5 }}>
-              {playing ? "En lecture…" : "En pause"}
-            </button>
+            <span>{playing ? 'Lecture…' : 'En pause'}</span>
           )}
         </div>
       )}
@@ -114,8 +147,9 @@ export default function LecteurYoutube({
   );
 }
 
-// Extraction d'ID YouTube robuste
-function extractVideoID(u) {
-  const m = u.match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/);
-  return m ? m[1] : null;
-}
+LecteurYoutube.propTypes = {
+  url:      PropTypes.string.isRequired,
+  socket:   PropTypes.object.isRequired,
+  roomId:   PropTypes.string.isRequired,
+  isOwner:  PropTypes.bool.isRequired
+};
