@@ -4,7 +4,6 @@ import { useState } from "react";
 import { postData } from "../../../services/api";
 import { useRouter } from 'next/navigation';
 
-
 export default function Login() {
   const [username, setUsername] = useState(""); 
   const [password, setPassword] = useState("");
@@ -17,18 +16,11 @@ export default function Login() {
     setLoading(true);
 
     const result = await postData("login", { username, password });
-    //console.log("Login result: ", result);
-    console.log(localStorage.getItem("user"));
 
     if (result) {
-    
        localStorage.setItem("token", result.data.token);
        localStorage.setItem("user", result.data.user);
-       const user = localStorage.getItem("user");
-       console.log(user);
-
        localStorage.setItem("isAuthenticated", true);
-       console.log(localStorage.getItem("user"));
        router.push("/rooms"); 
     } 
     
@@ -38,6 +30,11 @@ export default function Login() {
     }
 
     setLoading(false);
+  };
+
+  // Handle redirect to "Mot de passe oublié"
+  const handleForgotPassword = () => {
+    router.push("/mdp-oublie");
   };
 
   return (
@@ -97,7 +94,13 @@ export default function Login() {
 
         {/* Lien vers la page de réinitialisation du mot de passe */}
         <div className="mt-4 text-center">
-          <a href="#" className="text-sm text-blue-500 hover:underline">Mot de passe oublié ?</a>
+          <a 
+            href="#"
+            onClick={handleForgotPassword}  // Handle click to navigate to mdp-oublie page
+            className="text-sm text-blue-500 hover:underline"
+          >
+            Mot de passe oublié ?
+          </a>
         </div>
       </div>
     </div>
