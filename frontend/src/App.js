@@ -20,7 +20,7 @@ function extractYouTubeID(url) {
 
 function App() {
   const [socket, setSocket]     = useState(null);
-  const [step, setStep]         = useState("login");      // login → lobby → create → chat
+  const [step, setStep]         = useState("login");
   const [pseudo, setPseudo]     = useState("");
   const [isGuest, setIsGuest]   = useState(false);
   const [rooms, setRooms]       = useState([]);
@@ -33,7 +33,6 @@ function App() {
   const [owner, setOwner]       = useState(false);
   const ytPlayerRef             = useRef(null);
 
-  // --- Init socket (only once) ---
   useEffect(() => {
     console.debug("🔧 Initialisation du socket...");
     const s = io(SOCKET_URL, { transports: ['polling', 'websocket'] });
@@ -56,7 +55,7 @@ function App() {
       setRoomId(rid);
       setRoomMeta(meta);
       setMessages([]);
-      // si MP4 : demander état
+
       if (meta.source === "mp4") {
         console.debug("▶ Demande état vidéo pour", rid);
         s.emit("get-room-state", { roomId: rid });
@@ -76,7 +75,7 @@ function App() {
     s.on("user-joined", ({ pseudo: p, userId }) => {
       console.debug(`👤 ${p} (${userId}) a rejoint`);
       setMessages((m) => [...m, { pseudo: "***", text: `${p} a rejoint` }]);
-      // proprio renvoie état MP4
+
       if (owner && roomMeta?.source === "mp4" && videoRef.current && userId !== s.id) {
         const st = {
           roomId,
@@ -120,7 +119,7 @@ function App() {
       resetToLobby();
     });
 
-    // initial + refresh périodique
+
     s.emit("get-rooms");
     const iv = setInterval(() => s.emit("get-rooms"), 5000);
 
@@ -129,7 +128,7 @@ function App() {
       s.disconnect();
       console.debug("🔌 Déconnexion socket");
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []);
 
   // --- helpers ---
