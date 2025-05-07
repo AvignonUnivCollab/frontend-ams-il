@@ -2,21 +2,23 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { postData } from "@/services/api"; // make sure this path works based on your config
+import { postData } from "@/services/api";
 
 export default function MdpOubliePage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setMessage("");
+    setLoading(true);
 
     try {
-      const response = await postData("/check-email", { email });
+      const response = await postData("check-email", { email });
 
       if (response?.data?.user) {
         router.push(`/mdp-change?email=${email}`);
@@ -25,6 +27,8 @@ export default function MdpOubliePage() {
       }
     } catch (err) {
       setError("Erreur lors de la vérification de l'e-mail.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -50,9 +54,16 @@ export default function MdpOubliePage() {
 
         <button
           type="submit"
+          disabled={loading}
           className="w-full bg-purple-600 text-white py-2 rounded-lg hover:bg-purple-700 transition"
         >
-          Vérifier l'e-mail
+          {loading ? (
+              <div className="flex justify-center items-center">
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+              </div>
+            ) : (
+              "Vérifier"
+            )}
         </button>
       </form>
     </div>

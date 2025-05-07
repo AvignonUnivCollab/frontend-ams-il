@@ -19,7 +19,7 @@ export default function RoomPage({ params }) {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [leaving, setLeaving] = useState({});
-  const [message, setMessage] = useState(""); // Nouveau message à écrire
+  const [message, setMessage] = useState("");
   const router = useRouter();
 
   useEffect(() => {
@@ -97,7 +97,7 @@ export default function RoomPage({ params }) {
       };
 
       if(response) {
-        setMessages((prevMessages) => [...prevMessages, response.data]);
+        setMessages((prevMessages) => [...prevMessages, newMessage]);
       }
     }catch(error) {
       console.error("Erreur de la requete ", error);
@@ -341,7 +341,7 @@ export default function RoomPage({ params }) {
           <h3 className="text-xl font-semibold mb-2 text-purple-700">Messages</h3>
           <div className="flex-1 overflow-y-auto space-y-3 p-2">
             {messages.length > 0 ? (
-              messages.map((msg, index) => (
+              messages.map((msg) => (
                 <div
                   key={msg.created_at}
                   className="bg-purple-100 p-2 rounded animate-fade-in"

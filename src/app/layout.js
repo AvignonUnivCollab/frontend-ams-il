@@ -18,67 +18,73 @@ const geistMono = Geist_Mono({
 
 export default function RootLayout({ children }) {
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [username, setUsername] = useState("");
+  const [authState, setAuthState] = useState({
+    isAuthenticated: false,
+    username: "",
+    user: null
+  });
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    const checkAuth = () => {
       const token = localStorage.getItem("token");
-      const storedUsername = localStorage.getItem("username");
-
-      if (token) {
-        setIsAuthenticated(true);
-        setUsername(storedUsername || ""); // récupère le username
-      } else {
-        setIsAuthenticated(false);
-        setUsername("");
+      const username = localStorage.getItem("username");
+      const userJson = localStorage.getItem("user");
+      
+      let user = null;
+      try {
+        if (userJson && userJson.startsWith("{") && userJson.endsWith("}")) {
+          user = JSON.parse(userJson);
+        }
+      } catch (e) {
+        console.error("Erreur de parsing user:", e);
       }
-    }
+  
+      setAuthState({
+        isAuthenticated: !!token,
+        username: username || "",
+        user
+      });
+    };
+  
+    checkAuth();
+    window.addEventListener('storage', checkAuth);
+    
+    return () => window.removeEventListener('storage', checkAuth);
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("username");
-
-    setIsAuthenticated(false);
-    setUsername("");
-
+    localStorage.removeItem("user");
+    setAuthState({ isAuthenticated: false, username: "", user: null });
     router.push("/login");
   };
 
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        style={{
-          backgroundImage: "url('/image/background.jpg')",
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        style={{ backgroundImage: "url('/image/background.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat",
           minHeight: "100vh",
-          width: "100vw",
-        }}
-      >
+          width: "100vw", }}>
         <nav className="text-white p-4" style={{ backgroundColor: "#6441A4" }}>
           <div className="container mx-auto flex justify-between items-center">
             <Link href="/" className="text-xl font-bold">WeSee</Link>
 
             <div className="hidden md:flex space-x-6">
-              {!isAuthenticated ? (
+              {!authState.isAuthenticated ? (
                 <>
-                  <Link href="/register" className="hover:text-gray-300">Crée Compte</Link>
+                  <Link href="/register" className="hover:text-gray-300">Créer Compte</Link>
                   <Link href="/login" className="hover:text-gray-300">Se connecter</Link>
                 </>
               ) : (
                 <>
                   <span className="text-sm font-medium">
-                    Bienvenu 👋 {username ? username : ""}
+                    Bienvenu 👋 {authState.user?.name || authState.username}
                   </span>
-
-                  <button
-                    onClick={handleLogout}
-                    className="hover:text-gray-300"
-                  >
+                  <button onClick={handleLogout} className="hover:text-gray-300">
                     Se déconnecter
                   </button>
                 </>
