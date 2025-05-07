@@ -3,7 +3,6 @@ import React, { useRef, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import './LecteurYoutube.css';
 
-// Charge l’API YouTube IFrame une seule fois
 let apiLoading = false;
 let apiReady   = false;
 const apiQueue = [];
@@ -21,7 +20,6 @@ function loadYouTubeAPI(cb) {
   };
 }
 
-// Extraction d'ID YouTube
 function extractVideoID(url) {
   const m = url.match(/(?:v=|youtu\.be\/|embed\/)([\w-]{11})/);
   return m ? m[1] : null;
@@ -118,7 +116,7 @@ export default function LecteurYoutube({ url, socket, roomId, isOwner }) {
 
   return (
     <div className="custom-yt-player">
-      {/* zone vidéo + click-blocker */}
+      {/* zone vidéo */}
       <div className="player-container">
         <div ref={containerRef} className="player-frame"/>
         <div className="click-blocker"/>
@@ -139,7 +137,7 @@ export default function LecteurYoutube({ url, socket, roomId, isOwner }) {
               <span>{Math.floor(currentTime)}/{Math.floor(duration)}s</span>
             </>
           ) : (
-            <span>{playing ? 'Lecture…' : 'En pause'}</span>
+            <span>{playing ? 'Lecture en cours...' : 'Vidéo mise en pause'}</span>
           )}
         </div>
       )}
