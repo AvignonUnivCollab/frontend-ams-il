@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { postData } from "../../../services/api";
 import { useRouter } from 'next/navigation';
+import Router from 'next/router';
 
 export default function Login() {
   const [username, setUsername] = useState(""); 
@@ -22,6 +23,7 @@ export default function Login() {
        localStorage.setItem("user", result.data.user);
        localStorage.setItem("isAuthenticated", true);
        router.push("/rooms"); 
+       router.refresh();
     } 
     
     if(!result) {

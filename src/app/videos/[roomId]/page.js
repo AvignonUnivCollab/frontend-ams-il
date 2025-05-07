@@ -98,6 +98,7 @@ export default function RoomPage({ params }) {
 
       if(response) {
         setMessages((prevMessages) => [...prevMessages, newMessage]);
+        setMessage("");
       }
     }catch(error) {
       console.error("Erreur de la requete ", error);
@@ -302,8 +303,8 @@ export default function RoomPage({ params }) {
                 <h3 className="text-lg font-semibold mb-2 text-purple-700">Playlist</h3>
                 <div className="space-y-2">
                   {playlist.length > 0 ? (
-                    playlist.map((video, index) => (
-                      <div key={index} className="flex items-center gap-2">
+                    playlist.map((video) => (
+                      <div key={video.created_at} className="flex items-center gap-2">
                        <iframe
                         className="rounded-lg w-small h-18 object-cover" 
                         width="150"
